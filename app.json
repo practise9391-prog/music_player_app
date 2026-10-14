@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Nova Music",
+    "slug": "music-player-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./public/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0a0b10"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./public/icon.png",
+        "backgroundColor": "#0a0b10"
+      },
+      "package": "com.pavan9391.musicapp",
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.WAKE_LOCK",
+        "android.permission.FOREGROUND_SERVICE"
+      ]
+    },
+    "owner": "pavan_9391",
+    "extra": {
+      "eas": {
+        "projectId": "a9120a30-c6f2-4d5d-b3ef-0fd1cee56e45"
+      }
+    }
+  }
+}
