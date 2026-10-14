@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0b10;
+  --surface: #12141e;
+  --surface-secondary: #191c2b;
+  --surface-card: #151824;
+  --sidebar-bg: #0e1017;
+  --border: #24283b;
+  --border-subtle: #1b1e2c;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #00f0ff;
+  --accent-hover: #38f5ff;
+  --accent-glow: rgba(0, 240, 255, 0.35);
+  --progress-bg: rgba(255, 255, 255, 0.1);
+  --progress-fill: #00f0ff;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  --btn-bg: #00f0ff;
+  --btn-hover: #38f5ff;
+  --btn-pressed: #00b8cc;
+  --btn-text: #05070e;
+  --btn-border: rgba(0, 240, 255, 0.4);
+  --btn-border-width: 1px;
+  --btn-glow-color: rgba(0, 240, 255, 0.5);
+  --btn-glow-spread: 10px;
+  --btn-radius: 8px;
+  --btn-scale: 1.0;
+  --btn-opacity: 1.0;
+
+  --radius: 12px;
+  --glass-blur: 14px;
+  --shadow-intensity: 0.4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--background);
+  color: var(--text-primary);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Styled Buttons adhering to button tokens */
+.btn-primary {
+  background-color: var(--btn-bg);
+  color: var(--btn-text);
+  border: var(--btn-border-width) solid var(--btn-border);
+  border-radius: var(--btn-radius);
+  opacity: var(--btn-opacity);
+  transform: scale(var(--btn-scale));
+  box-shadow: 0 0 var(--btn-glow-spread) var(--btn-glow-color);
+  transition: all 0.18s ease-in-out;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background-color: var(--btn-hover);
+  box-shadow: 0 0 calc(var(--btn-glow-spread) * 1.4) var(--btn-glow-color);
+}
+
+.btn-primary:active {
+  background-color: var(--btn-pressed);
+  transform: scale(calc(var(--btn-scale) * 0.97));
+}
+
+.btn-secondary {
+  background-color: var(--surface-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: all 0.18s ease-in-out;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 500;
+}
+
+.btn-secondary:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Glass Panels */
+.glass-panel {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--radius);
+}
+
+.glass-card {
+  background-color: var(--surface-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+  transition: all 0.2s ease;
+}
+
+.glass-card:hover {
+  border-color: var(--border);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

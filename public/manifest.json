@@ -1,0 +1,60 @@
+{
+  "name": "Nova Music Player",
+  "short_name": "Nova Music",
+  "description": "High-fidelity, offline-first music player with advanced audio engine, spatial audio, and synchronized lyrics.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0b10",
+  "theme_color": "#00e5ff",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Search Music",
+      "short_name": "Search",
+      "description": "Search your songs, albums, and artists",
+      "url": "/?action=search",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Favorites",
+      "short_name": "Favorites",
+      "description": "Open your favorite music",
+      "url": "/?action=favorites",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Playlists",
+      "short_name": "Playlists",
+      "description": "View and manage playlists",
+      "url": "/?action=playlists",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Recently Played",
+      "short_name": "History",
+      "description": "View recently played songs",
+      "url": "/?action=history",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    },
+    {
+      "name": "Now Playing",
+      "short_name": "Player",
+      "description": "Open full music player screen",
+      "url": "/?action=nowplaying",
+      "icons": [{ "src": "/favicon.svg", "sizes": "any" }]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "web+novamusic",
+      "url": "/?deeplink=%s"
+    }
+  ]
+}
+
