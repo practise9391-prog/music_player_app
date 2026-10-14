@@ -274,6 +274,11 @@ export class DownloadQueueService {
       return;
     }
 
+    const currentJob = await DownloadRepository.getById(job.id);
+    if (!currentJob || currentJob.status === 'paused' || currentJob.status === 'cancelled') {
+      return;
+    }
+
     const controller = new AbortController();
     this.activeControllers.set(job.id, controller);
 

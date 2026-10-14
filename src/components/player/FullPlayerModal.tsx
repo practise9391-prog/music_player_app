@@ -172,28 +172,29 @@ export const FullPlayerModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]/95 backdrop-blur-2xl animate-in fade-in duration-200">
       {/* Top Bar */}
-      <div className="h-16 px-8 flex items-center justify-between border-b border-[var(--border)]">
+      <div className="h-14 md:h-16 px-4 md:px-8 flex items-center justify-between border-b border-[var(--border)] gap-2 shrink-0">
         <button
           onClick={() => setIsFullPlayerOpen(false)}
-          className="flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          className="flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0"
         >
           <ChevronDown className="w-5 h-5" />
-          <span>Minimize Player</span>
+          <span className="hidden sm:inline">Minimize Player</span>
         </button>
 
         {/* Network State Badge */}
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-medium">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-medium">
           <span
             className={`w-2 h-2 rounded-full ${
               networkState.isAirGapped ? 'bg-amber-400' : 'bg-emerald-400'
             }`}
           />
           <span className="text-[var(--text-secondary)]">
-            {networkState.isAirGapped ? '● OFFLINE (AIR-GAP LOCKED)' : '● ONLINE — USER REQUESTED'}
+            {networkState.isAirGapped ? '● OFFLINE (AIR-GAP)' : '● ONLINE — REQUESTED'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Desktop Buttons */}
+        <div className="hidden md:flex items-center gap-2.5">
           <button
             onClick={toggleDspModal}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs font-semibold text-[var(--accent)] border border-[var(--border)] transition-colors"
@@ -239,15 +240,6 @@ export const FullPlayerModal: React.FC = () => {
           </button>
 
           <button
-            onClick={toggleDspModal}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs font-semibold text-[var(--text-primary)] border border-[var(--border)] transition-colors"
-            title="Open Audio Control Center (E)"
-          >
-            <Sliders className="w-3.5 h-3.5 text-[var(--accent)]" />
-            <span>Audio Center</span>
-          </button>
-
-          <button
             onClick={toggleQueue}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs font-semibold text-[var(--text-primary)] border border-[var(--border)] transition-colors"
             title="Open Queue"
@@ -255,9 +247,35 @@ export const FullPlayerModal: React.FC = () => {
             <ListMusic className="w-4 h-4 text-[var(--accent)]" />
             <span>Queue ({queue.length})</span>
           </button>
-          <span className="text-xs px-2.5 py-1 rounded-md bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--accent)] font-semibold tracking-wider uppercase">
-            {currentTrack?.source === 'local' ? 'LOCAL AUDIO' : 'STREAM'}
-          </span>
+        </div>
+
+        {/* Mobile Icon Buttons */}
+        <div className="flex md:hidden items-center gap-1.5">
+          <button
+            onClick={() => setShowLyrics(!showLyrics)}
+            className={`p-2 rounded-lg border transition-colors ${
+              showLyrics
+                ? 'bg-[var(--accent)] text-[var(--btn-text)] border-[var(--accent)]'
+                : 'bg-[var(--surface-secondary)] text-[var(--text-primary)] border-[var(--border)]'
+            }`}
+            title="Lyrics"
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+          <button
+            onClick={toggleDspModal}
+            className="p-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--accent)] border border-[var(--border)]"
+            title="Equalizer & DSP"
+          >
+            <Sliders className="w-4 h-4" />
+          </button>
+          <button
+            onClick={toggleQueue}
+            className="p-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)]"
+            title="Queue"
+          >
+            <ListMusic className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -276,7 +294,7 @@ export const FullPlayerModal: React.FC = () => {
           )}
 
           {currentTrack && (
-            <div className="flex items-center justify-center gap-3 pt-1">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
               <button
                 onClick={() => toggleFavorite(currentTrack.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${
@@ -474,19 +492,19 @@ export const FullPlayerModal: React.FC = () => {
         </div>
 
         {/* Primary Controls */}
-        <div className="flex items-center gap-5">
+        <div className="flex items-center justify-center gap-2 md:gap-5 w-full">
           <button
             onClick={cycleShuffleMode}
-            className={`px-3 py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl transition-all flex items-center gap-1.5 ${
               shuffleMode !== 'off'
                 ? 'text-[var(--accent)] bg-[var(--surface-secondary)] border border-[var(--accent)]/30'
                 : 'text-[var(--text-muted)] hover:text-white'
             }`}
             title={`Shuffle Mode: ${shuffleMode.toUpperCase()} (Click to cycle Off / Normal / Smart / Album)`}
           >
-            <Shuffle className="w-5 h-5" />
+            <Shuffle className="w-4 h-4 md:w-5 md:h-5" />
             {shuffleMode !== 'off' && (
-              <span className="text-[10px] font-bold uppercase tracking-wider">
+              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
                 {shuffleMode}
               </span>
             )}
@@ -494,7 +512,7 @@ export const FullPlayerModal: React.FC = () => {
 
           <button
             onClick={() => seekBackward(5)}
-            className="p-2 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
+            className="hidden sm:flex p-2 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
             title="Rewind 5s"
           >
             <RotateCcw className="w-5 h-5" />
@@ -502,35 +520,35 @@ export const FullPlayerModal: React.FC = () => {
 
           <button
             onClick={prevTrack}
-            className="p-3 rounded-full text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
+            className="p-2 md:p-3 rounded-full text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors active:scale-95"
             title="Previous"
           >
-            <SkipBack className="w-6 h-6 fill-current" />
+            <SkipBack className="w-5 h-5 md:w-6 md:h-6 fill-current" />
           </button>
 
           <button
             onClick={togglePlayPause}
-            className="w-16 h-16 rounded-full btn-primary flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+            className="w-14 h-14 md:w-16 md:h-16 rounded-full btn-primary flex items-center justify-center shadow-xl active:scale-95 transition-transform"
             title={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="w-7 h-7 fill-current text-[var(--btn-text)]" />
+              <Pause className="w-6 h-6 md:w-7 md:h-7 fill-current text-[var(--btn-text)]" />
             ) : (
-              <Play className="w-7 h-7 fill-current ml-1 text-[var(--btn-text)]" />
+              <Play className="w-6 h-6 md:w-7 md:h-7 fill-current ml-1 text-[var(--btn-text)]" />
             )}
           </button>
 
           <button
             onClick={nextTrack}
-            className="p-3 rounded-full text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors"
+            className="p-2 md:p-3 rounded-full text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors active:scale-95"
             title="Next"
           >
-            <SkipForward className="w-6 h-6 fill-current" />
+            <SkipForward className="w-5 h-5 md:w-6 md:h-6 fill-current" />
           </button>
 
           <button
             onClick={() => seekForward(5)}
-            className="p-2 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
+            className="hidden sm:flex p-2 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
             title="Forward 5s"
           >
             <RotateCw className="w-5 h-5" />

@@ -85,12 +85,20 @@ export const MiniPlayer: React.FC = () => {
   };
 
   return (
-    <div className="h-24 w-full bg-[var(--surface)] border-t border-[var(--border)] px-6 flex items-center justify-between gap-4 z-40 select-none backdrop-blur-md">
+    <div className="relative h-16 md:h-24 w-full bg-[var(--surface)] border-t border-[var(--border)] px-3 md:px-6 flex items-center justify-between gap-2 md:gap-4 z-40 select-none backdrop-blur-md">
+      {/* Top Thin Progress Bar for Mobile */}
+      <div className="md:hidden absolute top-0 left-0 right-0 h-1 bg-[var(--progress-bg)] overflow-hidden">
+        <div
+          className="h-full bg-[var(--accent)] transition-all duration-150"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
+
       {/* Left: Track Information & Artwork */}
-      <div className="flex items-center gap-4 min-w-[220px] max-w-[320px]">
+      <div className="flex items-center gap-2.5 md:gap-4 min-w-0 flex-1 md:flex-none md:min-w-[220px] md:max-w-[320px]">
         <div
           onClick={() => setIsFullPlayerOpen(true)}
-          className="relative group w-14 h-14 rounded-xl overflow-hidden bg-[var(--surface-secondary)] border border-[var(--border)] shrink-0 cursor-pointer flex items-center justify-center shadow-md"
+          className="relative group w-11 h-11 md:w-14 md:h-14 rounded-xl overflow-hidden bg-[var(--surface-secondary)] border border-[var(--border)] shrink-0 cursor-pointer flex items-center justify-center shadow-md"
         >
           {currentTrack?.coverArtUrl ? (
             <img
@@ -100,30 +108,29 @@ export const MiniPlayer: React.FC = () => {
             />
           ) : (
             <Disc
-              className={`w-7 h-7 text-[var(--accent)] ${
+              className={`w-6 h-6 md:w-7 md:h-7 text-[var(--accent)] ${
                 isPlaying ? 'animate-spin' : ''
               } transition-transform duration-1000`}
               style={{ animationDuration: '4s' }}
             />
           )}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Maximize2 className="w-5 h-5 text-white" />
+            <Maximize2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
           </div>
         </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1" onClick={() => setIsFullPlayerOpen(true)}>
           <div className="flex items-center gap-1.5">
             <span
-              onClick={() => setIsFullPlayerOpen(true)}
-              className="text-sm font-bold text-[var(--text-primary)] truncate hover:text-[var(--accent)] cursor-pointer transition-colors block"
+              className="text-xs md:text-sm font-bold text-[var(--text-primary)] truncate hover:text-[var(--accent)] cursor-pointer transition-colors block"
             >
               {currentTrack?.title || 'No track selected'}
             </span>
           </div>
-          <p className="text-xs text-[var(--text-secondary)] truncate">
+          <p className="text-[11px] md:text-xs text-[var(--text-secondary)] truncate">
             {currentTrack?.artist || 'Select audio to begin playback'}
           </p>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="hidden md:flex items-center gap-2 mt-1">
             {currentTrack?.sourceType === 'youtube' && currentTrack?.cached && (
               <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                 <Check className="w-2.5 h-2.5" /> CACHED YOUTUBE (OFFLINE)
@@ -184,8 +191,8 @@ export const MiniPlayer: React.FC = () => {
         )}
       </div>
 
-      {/* Center: Controls & Progress Seek */}
-      <div className="flex-1 max-w-2xl flex flex-col items-center gap-2">
+      {/* Center: Controls & Progress Seek (Desktop) */}
+      <div className="hidden md:flex flex-1 max-w-2xl flex-col items-center gap-2">
         <div className="flex items-center gap-4">
           <button
             onClick={cycleShuffleMode}
@@ -280,8 +287,37 @@ export const MiniPlayer: React.FC = () => {
         </div>
       </div>
 
-      {/* Right: Audio Profile, Playback Rate, Queue Drawer, Volume Slider, Full Screen */}
-      <div className="flex items-center gap-3 min-w-[220px] justify-end">
+      {/* Mobile Playback Actions */}
+      <div className="flex md:hidden items-center gap-1 shrink-0">
+        <button
+          onClick={togglePlayPause}
+          className="w-9 h-9 rounded-full btn-primary flex items-center justify-center shadow-md active:scale-95"
+          title={isPlaying ? 'Pause' : 'Play'}
+        >
+          {isPlaying ? (
+            <Pause className="w-4 h-4 fill-current text-[var(--btn-text)]" />
+          ) : (
+            <Play className="w-4 h-4 fill-current ml-0.5 text-[var(--btn-text)]" />
+          )}
+        </button>
+        <button
+          onClick={nextTrack}
+          className="p-1.5 rounded-lg text-[var(--text-secondary)] active:scale-95"
+          title="Next"
+        >
+          <SkipForward className="w-4 h-4 fill-current" />
+        </button>
+        <button
+          onClick={() => setIsFullPlayerOpen(true)}
+          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+          title="Open Full Player"
+        >
+          <Maximize2 className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Right: Audio Profile, Playback Rate, Queue Drawer, Volume Slider, Full Screen (Desktop) */}
+      <div className="hidden md:flex items-center gap-3 min-w-[220px] justify-end">
         {/* Playback speed toggle */}
         <button
           onClick={() => {

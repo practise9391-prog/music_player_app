@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sidebar, NavRoute } from '../components/layout/Sidebar';
+import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { Header } from '../components/layout/Header';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { FullPlayerModal } from '../components/player/FullPlayerModal';
@@ -24,6 +25,7 @@ import { useSettings } from '../settings/SettingsContext';
 import { appLockServiceInstance } from '../services/security/AppLockService';
 import { AppLockModal } from '../components/security/AppLockModal';
 import { FirstLaunchModal } from '../components/onboarding/FirstLaunchModal';
+import { InstallAppBanner } from '../components/common/InstallAppBanner';
 
 // Pages
 import { HomePage } from '../pages/HomePage';
@@ -213,6 +215,15 @@ export const AppShell: React.FC = () => {
       {/* Persistent Mini Player at Bottom */}
       <MiniPlayer />
 
+      {/* Mobile Bottom Navigation Bar */}
+      <MobileBottomNav
+        currentRoute={currentRoute}
+        onNavigate={(r) => {
+          setSelectedPlaylistId(null);
+          setCurrentRoute(r);
+        }}
+      />
+
       {/* Full Player Modal */}
       <FullPlayerModal />
 
@@ -279,6 +290,9 @@ export const AppShell: React.FC = () => {
         isOpen={!settings.firstLaunchCompleted}
         onComplete={() => {}}
       />
+
+      {/* Standalone PWA Mobile Install Banner */}
+      <InstallAppBanner />
 
       {/* Central Notification Toasts */}
       <ToastContainer />

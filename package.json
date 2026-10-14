@@ -6,11 +6,19 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "cap:sync": "npm run build && npx cap sync android",
+    "cap:open": "npx cap open android",
+    "apk:build": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "mobile": "node scripts/mobile-server.mjs",
+    "qr": "node scripts/mobile-server.mjs",
     "test": "vitest run",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/cli": "^8.5.3",
+    "@capacitor/core": "^8.5.3",
     "dexie": "^4.0.11",
     "lucide-react": "^1.51.0",
     "music-metadata-browser": "^2.5.11",
@@ -20,11 +28,13 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^24.13.3",
+    "@types/qrcode-terminal": "^0.12.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "fake-indexeddb": "^6.2.5",
     "oxlint": "^1.81.0",
+    "qrcode-terminal": "^0.12.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",

@@ -102,7 +102,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--border)] flex flex-col justify-between p-4 shrink-0 select-none overflow-hidden">
+    <aside className="hidden md:flex w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--border)] flex-col justify-between p-4 shrink-0 select-none overflow-hidden">
       <div className="flex flex-col min-h-0 flex-1 space-y-5">
         {/* App Logo & Header */}
         <div className="flex items-center gap-3 px-2 py-1 shrink-0">

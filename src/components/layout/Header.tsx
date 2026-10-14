@@ -28,39 +28,39 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-16 px-6 bg-[var(--background)]/80 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between gap-4 select-none shrink-0">
+    <header className="h-14 md:h-16 px-3 md:px-6 bg-[var(--background)]/80 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between gap-2 md:gap-4 select-none shrink-0">
       {/* Route Title & Search */}
-      <div className="flex items-center gap-6 flex-1 max-w-xl">
-        <h2 className="text-lg font-bold text-[var(--text-primary)] capitalize shrink-0 tracking-tight">
+      <div className="flex items-center gap-3 md:gap-6 flex-1 max-w-xl min-w-0">
+        <h2 className="text-base md:text-lg font-bold text-[var(--text-primary)] capitalize shrink-0 tracking-tight">
           {title}
         </h2>
 
         {/* Global Search Bar (Ctrl+K ready) */}
         <div
-          className="relative flex-1 cursor-pointer"
+          className="relative flex-1 cursor-pointer min-w-0"
           onClick={onOpenSearchModal}
         >
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Search className="w-3.5 h-3.5 md:w-4 md:h-4 absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             readOnly={Boolean(onOpenSearchModal)}
-            placeholder="Search library, artists, history... (Ctrl+K)"
+            placeholder="Search music..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-9 pr-12 py-1.5 rounded-[var(--radius)] bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer"
+            className="w-full pl-8 md:pl-9 pr-3 md:pr-12 py-1 md:py-1.5 rounded-[var(--radius)] bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer truncate"
           />
-          <kbd className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
+          <kbd className="hidden md:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
             ⌘K
           </kbd>
         </div>
       </div>
 
       {/* Right: Network Status Indicator & Dev Mode Toggle */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
         {/* Network State Badge (Section 3) */}
         <button
           onClick={onOpenNetworkModal}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${
+          className={`flex items-center gap-1.5 px-2 md:px-3 py-1 md:py-1.5 rounded-full border text-[11px] md:text-xs font-semibold transition-all ${
             networkState.isAirGapped
               ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20'
               : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
@@ -69,13 +69,13 @@ export const Header: React.FC<HeaderProps> = ({
         >
           {networkState.isAirGapped ? (
             <>
-              <Lock className="w-3.5 h-3.5" />
-              <span>● OFFLINE (LOCKED)</span>
+              <Lock className="w-3 h-3 md:w-3.5 md:h-3.5" />
+              <span>● <span className="hidden sm:inline">OFFLINE (LOCKED)</span><span className="sm:hidden">OFFLINE</span></span>
             </>
           ) : (
             <>
-              <Unlock className="w-3.5 h-3.5" />
-              <span>● ONLINE — USER REQUESTED</span>
+              <Unlock className="w-3 h-3 md:w-3.5 md:h-3.5" />
+              <span>● <span className="hidden sm:inline">ONLINE</span><span className="sm:hidden">ONLINE</span></span>
             </>
           )}
         </button>
