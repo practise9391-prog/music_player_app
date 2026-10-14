@@ -17,7 +17,7 @@
         "foregroundImage": "./public/icon.png",
         "backgroundColor": "#0a0b10"
       },
-      "package": "com.pavan9391.musicapp",
+      "package": "com.novamusic.player",
       "permissions": [
         "android.permission.INTERNET",
         "android.permission.READ_EXTERNAL_STORAGE",
