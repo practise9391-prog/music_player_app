@@ -139,7 +139,7 @@ export const DownloadsPage: React.FC = () => {
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden select-none">
       {/* Top Header Bar */}
-      <div className="p-6 border-b border-[var(--border)] bg-[var(--surface)] space-y-4 shrink-0">
+      <div className="p-3 sm:p-4 md:p-6 border-b border-[var(--border)] bg-[var(--surface)] space-y-3 sm:space-y-4 shrink-0">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2.5">

@@ -1228,7 +1228,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 select-none">
+    <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 select-none">
       {/* Prominent Search Input Entrypoint */}
       {renderSearchBar()}
 

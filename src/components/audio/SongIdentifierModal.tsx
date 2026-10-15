@@ -11,6 +11,7 @@ import {
   ExternalLink,
   Heart,
   Search,
+  ArrowLeft,
 } from 'lucide-react';
 import {
   songIdentificationService,
@@ -78,9 +79,18 @@ export const SongIdentifierModal: React.FC<SongIdentifierModalProps> = ({
       <div className="relative w-full max-w-md rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl overflow-hidden p-6 text-center space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 text-xs font-semibold transition-all active:scale-95 border border-slate-700"
+            title="Go back"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-4 h-4 text-cyan-400" />
+            <span>Back</span>
+          </button>
+          <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-xs uppercase tracking-wider">
             <Sparkles className="w-4 h-4" />
-            <span>Song Identifier • Acoustic Radar</span>
+            <span>Identify Song</span>
           </div>
           <button
             onClick={onClose}
@@ -200,3 +210,4 @@ export const SongIdentifierModal: React.FC<SongIdentifierModalProps> = ({
     </div>
   );
 };
+

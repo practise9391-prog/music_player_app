@@ -12,6 +12,7 @@ import {
   Repeat,
   Shuffle,
   ChevronDown,
+  ArrowLeft,
   Sparkles,
   Sliders,
   Shield,
@@ -172,13 +173,15 @@ export const FullPlayerModal: React.FC = () => {
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]/95 backdrop-blur-2xl animate-in fade-in duration-200">
       {/* Top Bar */}
-      <div className="h-14 md:h-16 px-4 md:px-8 flex items-center justify-between border-b border-[var(--border)] gap-2 shrink-0">
+      <div className="h-14 md:h-16 px-3 sm:px-4 md:px-8 flex items-center justify-between border-b border-[var(--border)] gap-2 shrink-0">
         <button
           onClick={() => setIsFullPlayerOpen(false)}
-          className="flex items-center gap-2 text-sm font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs sm:text-sm font-semibold text-[var(--text-primary)] transition-all shrink-0 border border-[var(--border)] active:scale-95 shadow-sm"
+          title="Back (Minimize Player)"
+          aria-label="Back"
         >
-          <ChevronDown className="w-5 h-5" />
-          <span className="hidden sm:inline">Minimize Player</span>
+          <ArrowLeft className="w-4 h-4 text-[var(--accent)]" />
+          <span>Back</span>
         </button>
 
         {/* Network State Badge */}

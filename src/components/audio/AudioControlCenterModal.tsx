@@ -37,6 +37,7 @@ import {
   CheckCircle2,
   Shield,
   Layers,
+  ArrowLeft,
 } from 'lucide-react';
 import { AudioFormatInfoModal } from '../modals/AudioFormatInfoModal';
 
@@ -226,9 +227,18 @@ export const AudioControlCenterModal: React.FC = () => {
       >
         <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] shadow-2xl overflow-hidden">
           {/* HEADER BAR */}
-          <div className="h-16 px-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--surface-secondary)]/60">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)]">
+          <div className="h-16 px-4 sm:px-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--surface-secondary)]/60">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                onClick={handleClose}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] transition-all active:scale-95 shadow-sm"
+                title="Go back"
+                aria-label="Go back"
+              >
+                <ArrowLeft className="w-4 h-4 text-[var(--accent)]" />
+                <span className="hidden sm:inline">Back</span>
+              </button>
+              <div className="p-2 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hidden sm:block">
                 <Sliders className="w-5 h-5" />
               </div>
               <div>

@@ -39,6 +39,8 @@ import { DownloadsPage } from '../pages/DownloadsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { GlobalSearchModal } from '../components/search/GlobalSearchModal';
 
+import { backNavigationService } from '../services/navigation/BackNavigationService';
+
 export const AppShell: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('home');
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
@@ -55,6 +57,14 @@ export const AppShell: React.FC = () => {
     setMute,
     isFullPlayerOpen,
     setIsFullPlayerOpen,
+    isQueueOpen,
+    setIsQueueOpen,
+    isDspModalOpen,
+    setIsDspModalOpen,
+    isSpatialModalOpen,
+    setIsSpatialModalOpen,
+    isFullscreenVisualizerOpen,
+    setIsFullscreenVisualizerOpen,
     isAudioOutputModalOpen,
     setIsAudioOutputModalOpen,
     isStoragePermissionModalOpen,
@@ -127,6 +137,149 @@ export const AppShell: React.FC = () => {
     });
   }, [setIsFullPlayerOpen]);
 
+  // Track route history for back button navigation
+  useEffect(() => {
+    backNavigationService.pushRoute(currentRoute);
+  }, [currentRoute]);
+
+  // Register all modal & drawer back handlers in priority order
+  useEffect(() => {
+    const unregisterIdentify = isIdentifyModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsIdentifyModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterSearch = isGlobalSearchOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsGlobalSearchOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterNetwork = isNetworkModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsNetworkModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterDebug = isDebugModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsDebugModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterAudioOutput = isAudioOutputModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsAudioOutputModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterStoragePerm = isStoragePermissionModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsStoragePermissionModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterWidgetPrev = isWidgetPreviewModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsWidgetPreviewModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterVisualizer = isFullscreenVisualizerOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsFullscreenVisualizerOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterSpatial = isSpatialModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsSpatialModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterDsp = isDspModalOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsDspModalOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterQueue = isQueueOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsQueueOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterFullPlayer = isFullPlayerOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsFullPlayerOpen(false);
+          return true;
+        })
+      : null;
+
+    const unregisterPlaylistSelect = selectedPlaylistId
+      ? backNavigationService.registerHandler(() => {
+          setSelectedPlaylistId(null);
+          return true;
+        })
+      : null;
+
+    return () => {
+      unregisterIdentify?.();
+      unregisterSearch?.();
+      unregisterNetwork?.();
+      unregisterDebug?.();
+      unregisterAudioOutput?.();
+      unregisterStoragePerm?.();
+      unregisterWidgetPrev?.();
+      unregisterVisualizer?.();
+      unregisterSpatial?.();
+      unregisterDsp?.();
+      unregisterQueue?.();
+      unregisterFullPlayer?.();
+      unregisterPlaylistSelect?.();
+    };
+  }, [
+    isIdentifyModalOpen,
+    isGlobalSearchOpen,
+    isNetworkModalOpen,
+    isDebugModalOpen,
+    isAudioOutputModalOpen,
+    isStoragePermissionModalOpen,
+    isWidgetPreviewModalOpen,
+    isFullscreenVisualizerOpen,
+    isSpatialModalOpen,
+    isDspModalOpen,
+    isQueueOpen,
+    isFullPlayerOpen,
+    selectedPlaylistId,
+    setIsFullPlayerOpen,
+    setIsQueueOpen,
+    setIsDspModalOpen,
+    setIsSpatialModalOpen,
+    setIsFullscreenVisualizerOpen,
+    setIsAudioOutputModalOpen,
+    setIsStoragePermissionModalOpen,
+    setIsWidgetPreviewModalOpen,
+  ]);
+
+  const handleGoBack = () => {
+    backNavigationService.triggerBack((targetRoute) => {
+      setCurrentRoute(targetRoute as NavRoute);
+    });
+  };
+
   // Handler for adding a music folder directly from Home page
   const handleOpenMusicFolder = async () => {
     const res = await nativeBridge.pickDirectoryFiles();
@@ -173,7 +326,9 @@ export const AppShell: React.FC = () => {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 bg-[var(--background)] overflow-hidden">
           <Header
-            title={currentRoute}
+            title={selectedPlaylistId ? 'Playlist' : currentRoute}
+            canGoBack={currentRoute !== 'home' || Boolean(selectedPlaylistId)}
+            onBack={handleGoBack}
             onOpenNetworkModal={() => setIsNetworkModalOpen(true)}
             onOpenDebugModal={() => setIsDebugModalOpen(true)}
             searchQuery={searchQuery}

@@ -412,10 +412,10 @@ export const LibraryPage: React.FC = () => {
       className="flex-1 flex flex-col h-full overflow-hidden select-none bg-[var(--background)]"
     >
       {/* Top Header & Navigation */}
-      <div className="p-6 border-b border-[var(--border)] space-y-4 shrink-0 bg-[var(--background)]">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="p-3 sm:p-4 md:p-6 border-b border-[var(--border)] space-y-2.5 sm:space-y-4 shrink-0 bg-[var(--background)]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
           {/* Main Tabs */}
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] overflow-x-auto">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] overflow-x-auto">
             {[
               { id: 'songs', label: 'Songs', icon: Music2, count: tracks.length },
               { id: 'albums', label: 'Albums', icon: Disc, count: albums.length },

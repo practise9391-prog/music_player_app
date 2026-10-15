@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Lock, Unlock, Terminal, Sliders, Shield, Mic } from 'lucide-react';
+import { Search, Lock, Unlock, Terminal, Sliders, Shield, Mic, ArrowLeft } from 'lucide-react';
 import { useNetwork } from '../../network/NetworkContext';
 import { useSettings } from '../../settings/SettingsContext';
 
@@ -11,6 +11,8 @@ interface HeaderProps {
   onSearchChange: (query: string) => void;
   onOpenSearchModal?: () => void;
   onOpenIdentifyModal?: () => void;
+  canGoBack?: boolean;
+  onBack?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -21,6 +23,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSearchChange,
   onOpenSearchModal,
   onOpenIdentifyModal,
+  canGoBack,
+  onBack,
 }) => {
   const { networkState } = useNetwork();
   const { settings, updateSettings } = useSettings();
@@ -30,10 +34,21 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="h-14 md:h-16 px-3 md:px-6 bg-[var(--background)]/80 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between gap-2 md:gap-4 select-none shrink-0">
+    <header className="h-14 md:h-16 px-2.5 sm:px-4 md:px-6 bg-[var(--background)]/85 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between gap-1.5 sm:gap-3 md:gap-4 select-none shrink-0">
       {/* Route Title & Search */}
-      <div className="flex items-center gap-3 md:gap-6 flex-1 max-w-xl min-w-0">
-        <h2 className="text-base md:text-lg font-bold text-[var(--text-primary)] capitalize shrink-0 tracking-tight">
+      <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 flex-1 max-w-xl min-w-0">
+        {canGoBack && (
+          <button
+            onClick={onBack}
+            className="p-1.5 -ml-1 rounded-full hover:bg-[var(--surface-secondary)] text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0 active:scale-90"
+            title="Go Back"
+            aria-label="Go Back"
+          >
+            <ArrowLeft className="w-5 h-5 text-[var(--text-primary)]" />
+          </button>
+        )}
+
+        <h2 className="text-sm sm:text-base md:text-lg font-bold text-[var(--text-primary)] capitalize shrink-0 tracking-tight">
           {title}
         </h2>
 

@@ -61,6 +61,7 @@ import {
   RefreshCw,
   MoreVertical,
   SlidersHorizontal,
+  ArrowLeft,
 } from 'lucide-react';
 import { AlbumDetailsModal } from '../modals/AlbumDetailsModal';
 import { ArtistDetailsModal } from '../modals/ArtistDetailsModal';
@@ -278,8 +279,16 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4 bg-black/85 backdrop-blur-md animate-fade-in select-none">
       <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] shadow-2xl overflow-hidden text-[var(--text-primary)]">
         {/* Top Search Input Bar */}
-        <div className="relative flex items-center px-4 py-3.5 border-b border-[var(--border)] bg-[var(--surface)] gap-2">
-          <Search className="w-5 h-5 text-[var(--accent)] shrink-0" />
+        <div className="relative flex items-center px-3 sm:px-4 py-3 border-b border-[var(--border)] bg-[var(--surface)] gap-2">
+          <button
+            onClick={onClose}
+            className="p-1.5 -ml-1 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors shrink-0 active:scale-95"
+            title="Go back (Close search)"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="w-5 h-5 text-[var(--accent)]" />
+          </button>
+          <Search className="w-4 h-4 text-[var(--text-muted)] shrink-0 hidden sm:inline" />
           <input
             ref={inputRef}
             type="text"

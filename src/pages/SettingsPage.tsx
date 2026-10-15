@@ -352,7 +352,7 @@ export const SettingsPage: React.FC = () => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 space-y-6 select-none">
+    <div className="flex-1 overflow-y-auto p-3 sm:p-6 md:p-8 space-y-4 sm:space-y-6 select-none">
       <div>
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Settings & Preferences</h1>
         <p className="text-sm text-[var(--text-secondary)]">

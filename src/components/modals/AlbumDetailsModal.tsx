@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Album, Track } from '../../types';
 import { Button } from '../ui/Button';
-import { Play, Disc, Clock, X, Heart, Shuffle, ListPlus } from 'lucide-react';
+import { Play, Disc, Clock, X, Heart, Shuffle, ListPlus, ArrowLeft } from 'lucide-react';
 import { usePlayer } from '../../player/PlayerContext';
 import { EntityFavoriteRepository } from '../../database/repository';
+import { backNavigationService } from '../../services/navigation/BackNavigationService';
 
 interface AlbumDetailsModalProps {
   album: Album | null;
@@ -24,6 +25,15 @@ export const AlbumDetailsModal: React.FC<AlbumDetailsModalProps> = ({
 }) => {
   const { playTrack, currentTrack, toggleFavorite, shufflePlaylist, addToQueue } = usePlayer();
   const [isAlbumFavorite, setIsAlbumFavorite] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      return backNavigationService.registerHandler(() => {
+        onClose();
+        return true;
+      });
+    }
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (album) {
@@ -53,15 +63,29 @@ export const AlbumDetailsModal: React.FC<AlbumDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150">
       <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] shadow-2xl overflow-hidden">
-        {/* Top Header Close */}
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white bg-black/40 hover:bg-black/60 transition-colors"
-        >
-          <X className="w-5 h-5" />
-        </button>
+        {/* Top Header Back / Close */}
+        <div className="flex items-center justify-between p-3 sm:p-4 border-b border-[var(--border)] bg-[var(--surface-secondary)]/50 shrink-0">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] transition-all active:scale-95 shadow-sm"
+            title="Back to library"
+            aria-label="Back"
+          >
+            <ArrowLeft className="w-4 h-4 text-[var(--accent)]" />
+            <span>Back</span>
+          </button>
+          <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider truncate max-w-[200px]">
+            {album.title}
+          </span>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Hero Section */}
         <div className="p-6 bg-gradient-to-b from-[var(--surface-secondary)] to-[var(--surface-card)] flex flex-col sm:flex-row items-center gap-6 border-b border-[var(--border)]">
