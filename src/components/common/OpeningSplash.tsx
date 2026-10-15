@@ -90,3 +90,4 @@ export const OpeningSplash: React.FC<OpeningSplashProps> = ({ onFinish }) => {
     </div>
   );
 };
+
