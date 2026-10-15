@@ -7,6 +7,7 @@ export type FilterQuality = 'all' | 'under_128' | '128_to_256' | '256_to_320' | 
 export type QuickFilterType =
   | 'all'
   | 'favorites'
+  | 'recently_played'
   | 'recently_added'
   | 'most_played'
   | 'lossless'
@@ -200,6 +201,10 @@ export class FilterEngine {
     switch (quickFilter) {
       case 'favorites':
         return tracks.filter((t) => t.isFavorite);
+      case 'recently_played': {
+        const sorted = [...tracks].sort((a, b) => (b.lastPlayedAt || 0) - (a.lastPlayedAt || 0));
+        return sorted.filter((t) => (t.lastPlayedAt || 0) > 0);
+      }
       case 'recently_added': {
         const sorted = [...tracks].sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0));
         return sorted.slice(0, 50);

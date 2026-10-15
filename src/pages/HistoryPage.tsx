@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { YouTubeHistoryRecord, PlayHistoryRecord } from '../types';
-import { YouTubeHistoryRepository, PlayHistoryRepository } from '../database/repository';
+import { YouTubeHistoryRecord, PlayHistoryRecord, Track } from '../types';
+import { YouTubeHistoryRepository, PlayHistoryRepository, TrackRepository } from '../database/repository';
 import { CacheManager } from '../services/youtube/CacheManager';
 import { usePlayer } from '../player/PlayerContext';
 import { notificationService } from '../services/errorService';
@@ -18,15 +18,16 @@ import {
   CheckCircle,
   Heart,
   RefreshCw,
+  Play,
 } from 'lucide-react';
 
 type SortOption = 'recent' | 'most_played' | 'oldest' | 'cached' | 'favorites';
 type FilterOption = 'all' | 'cached' | 'online_only' | 'favorites';
 
 export const HistoryPage: React.FC = () => {
-  const { playCachedYouTubeTrack, playYouTubeUrl } = usePlayer();
+  const { playCachedYouTubeTrack, playYouTubeUrl, playTrack } = usePlayer();
 
-  const [activeTab, setActiveTab] = useState<'youtube' | 'local'>('youtube');
+  const [activeTab, setActiveTab] = useState<'local' | 'youtube'>('local');
   const [youtubeHistory, setYoutubeHistory] = useState<YouTubeHistoryRecord[]>([]);
   const [playHistory, setPlayHistory] = useState<PlayHistoryRecord[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,6 +180,38 @@ export const HistoryPage: React.FC = () => {
     loadData();
   };
 
+  const handlePlayLocalTrack = async (item: PlayHistoryRecord) => {
+    try {
+      let track = await TrackRepository.getById(item.trackId);
+      if (!track) {
+        track = {
+          id: item.trackId,
+          title: item.title,
+          artist: item.artist,
+          duration: item.playDuration || 0,
+          format: 'mp3',
+          dateAdded: item.playedAt,
+          playCount: 1,
+          isFavorite: false,
+          source: item.source || 'local',
+          path: item.trackId,
+        };
+      }
+      await playTrack(track);
+      notificationService.success('Now Playing', `${track.title} - ${track.artist}`);
+    } catch (err: any) {
+      notificationService.error('Replay Failed', err?.message || 'Could not play history track.');
+    }
+  };
+
+  const handleClearLocalHistory = async () => {
+    if (window.confirm('Clear all playback history records?')) {
+      await PlayHistoryRepository.clear();
+      setPlayHistory([]);
+      notificationService.info('History Cleared', 'Local playback history logs cleared.');
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-8 space-y-6">
       {/* Header */}
@@ -193,17 +226,6 @@ export const HistoryPage: React.FC = () => {
         {/* Tab switcher */}
         <div className="flex items-center gap-2 p-1 rounded-xl bg-[var(--surface-card)] border border-[var(--border)]">
           <button
-            onClick={() => setActiveTab('youtube')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
-              activeTab === 'youtube'
-                ? 'bg-[var(--accent)] text-[var(--btn-text)]'
-                : 'text-[var(--text-secondary)] hover:text-white'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" />
-            <span>YouTube History ({youtubeHistory.length})</span>
-          </button>
-          <button
             onClick={() => setActiveTab('local')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
               activeTab === 'local'
@@ -214,8 +236,94 @@ export const HistoryPage: React.FC = () => {
             <HistoryIcon className="w-3.5 h-3.5" />
             <span>Local Play History ({playHistory.length})</span>
           </button>
+          <button
+            onClick={() => setActiveTab('youtube')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
+              activeTab === 'youtube'
+                ? 'bg-[var(--accent)] text-[var(--btn-text)]'
+                : 'text-[var(--text-secondary)] hover:text-white'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>YouTube History ({youtubeHistory.length})</span>
+          </button>
         </div>
       </div>
+
+      {activeTab === 'local' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              Playback Activity ({playHistory.length})
+            </span>
+            {playHistory.length > 0 && (
+              <button
+                onClick={handleClearLocalHistory}
+                className="px-2.5 py-1 rounded-lg text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Clear History</span>
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {playHistory.length === 0 ? (
+              <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-2">
+                <HistoryIcon className="w-8 h-8 text-[var(--text-muted)] mx-auto opacity-50" />
+                <div className="text-sm font-semibold text-[var(--text-primary)]">No Playback History Yet</div>
+                <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
+                  Play songs from your local library or online streams to track your listening journey.
+                </p>
+              </div>
+            ) : (
+              playHistory.map((item, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => handlePlayLocalTrack(item)}
+                  className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs cursor-pointer group transition-colors shadow-sm"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePlayLocalTrack(item);
+                      }}
+                      className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] group-hover:bg-[var(--accent)] text-[var(--text-muted)] group-hover:text-[var(--btn-text)] flex items-center justify-center transition-colors shrink-0"
+                      title="Replay this track"
+                    >
+                      <Play className="w-4 h-4 fill-current ml-0.5" />
+                    </button>
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
+                        {item.title}
+                      </div>
+                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
+                        {item.artist}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                        item.source === 'online'
+                          ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                      }`}
+                    >
+                      {item.source === 'online' ? 'Online' : 'Local'}
+                    </span>
+                    <div className="text-[10px] text-[var(--text-muted)] font-mono">
+                      {new Date(item.playedAt).toLocaleDateString()} {new Date(item.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {activeTab === 'youtube' && (
         <>
@@ -308,32 +416,6 @@ export const HistoryPage: React.FC = () => {
             </div>
           )}
         </>
-      )}
-
-      {/* Local Play History Tab */}
-      {activeTab === 'local' && (
-        <div className="space-y-2">
-          {playHistory.length === 0 ? (
-            <div className="p-8 text-center rounded-xl bg-[var(--surface-card)] border border-[var(--border)] text-xs text-[var(--text-secondary)]">
-              No playback history recorded yet.
-            </div>
-          ) : (
-            playHistory.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] text-xs"
-              >
-                <div>
-                  <div className="font-semibold text-[var(--text-primary)]">{item.title}</div>
-                  <div className="text-[11px] text-[var(--text-secondary)]">{item.artist}</div>
-                </div>
-                <div className="text-[10px] text-[var(--text-muted)] font-mono">
-                  {new Date(item.playedAt).toLocaleTimeString()}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
       )}
 
       {/* Details Modal */}

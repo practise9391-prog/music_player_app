@@ -15,6 +15,7 @@ import { QueuedOnlineTrackModal } from '../components/youtube/QueuedOnlineTrackM
 import { AudioOutputModal } from '../components/audio/AudioOutputModal';
 import { StoragePermissionModal } from '../components/modals/StoragePermissionModal';
 import { WidgetPreviewModal } from '../components/widgets/WidgetPreviewModal';
+import { SongIdentifierModal } from '../components/audio/SongIdentifierModal';
 import { deepLinkManagerInstance } from '../services/navigation/DeepLinkManager';
 import { usePlayer } from '../player/PlayerContext';
 import { nativeBridge } from '../services/nativeBridge';
@@ -45,6 +46,7 @@ export const AppShell: React.FC = () => {
   const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
+  const [isIdentifyModalOpen, setIsIdentifyModalOpen] = useState(false);
 
   const {
     togglePlayPause,
@@ -177,6 +179,7 @@ export const AppShell: React.FC = () => {
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
             onOpenSearchModal={() => setIsGlobalSearchOpen(true)}
+            onOpenIdentifyModal={() => setIsIdentifyModalOpen(true)}
           />
 
           <div className="flex-1 flex overflow-hidden">
@@ -191,6 +194,7 @@ export const AppShell: React.FC = () => {
                   setSelectedPlaylistId(pId || null);
                 }}
                 onOpenSearchModal={() => setIsGlobalSearchOpen(true)}
+                onOpenIdentifyModal={() => setIsIdentifyModalOpen(true)}
                 searchQuery={searchQuery}
               />
             )}
@@ -222,6 +226,7 @@ export const AppShell: React.FC = () => {
           setSelectedPlaylistId(null);
           setCurrentRoute(r);
         }}
+        onOpenSearch={() => setIsGlobalSearchOpen(true)}
       />
 
       {/* Full Player Modal */}
@@ -277,6 +282,12 @@ export const AppShell: React.FC = () => {
       <WidgetPreviewModal
         isOpen={isWidgetPreviewModalOpen}
         onClose={() => setIsWidgetPreviewModalOpen(false)}
+      />
+
+      {/* Shazam Song Identifier Modal */}
+      <SongIdentifierModal
+        isOpen={isIdentifyModalOpen}
+        onClose={() => setIsIdentifyModalOpen(false)}
       />
 
       {/* App Lock Screen Protection Modal (Part 20) */}

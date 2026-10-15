@@ -2,6 +2,7 @@ import { Track } from '../../types';
 import { db } from '../../database/db';
 import { TrackRepository } from '../../database/repository';
 import { parseAudioFileMetadata, generateTrackIdentity } from '../../library/metadataParser';
+import { audioBlobStorageService } from '../storage/AudioBlobStorageService';
 
 export interface MediaStoreSyncResult {
   added: number;
@@ -87,7 +88,7 @@ export class MediaStoreSyncService {
         try {
           const meta = await parseAudioFileMetadata(file, normalizedPath, file.name, modifiedAt);
           const trackId = existing ? existing.id : generateTrackIdentity(normalizedPath, file.size, modifiedAt);
-          const audioUrl = URL.createObjectURL(file);
+          const audioUrl = await audioBlobStorageService.storeAudioBlob(trackId, file);
 
           const track: Track = {
             id: trackId,

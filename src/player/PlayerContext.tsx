@@ -75,6 +75,7 @@ import { youtubeResolverInstance } from '../services/youtube/YouTubeResolver';
 import { NetworkAccessManager } from '../network/NetworkAccessManager';
 import { OnlineAudioSource, LocalAudioSource } from '../audio/AudioSource';
 import { CacheManager } from '../services/youtube/CacheManager';
+import { audioBlobStorageService } from '../services/storage/AudioBlobStorageService';
 
 export interface PlayerContextType {
   state: AudioEngineState;
@@ -581,7 +582,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Play track implementation
   const playTrack = useCallback(
     async (track: Track, newQueue?: Track[], startIndex?: number) => {
-      await finalizeCurrentSession(false);
+      // Finalize previous session asynchronously in the background so transient user gesture is preserved
+      finalizeCurrentSession(false).catch((err) => console.warn('Finalize session notice:', err));
 
       let targetQueue = queueRef.current;
       let targetIndex = 0;
@@ -612,13 +614,29 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setShuffledOrder(generateShuffleOrder(targetQueue.length, targetIndex, shuffleModeRef.current, targetQueue));
       }
 
+      // Guarantee a verified, playable audio URL (memory blob, IndexedDB blob, Capacitor native, or synth)
+      const playableUrl = await audioBlobStorageService.getPlayableUrl(track);
+
       const effectiveTrack: Track = {
         ...track,
-        path: (track as unknown as { playbackUrl?: string }).playbackUrl || track.path,
+        playbackUrl: playableUrl || (track as unknown as { playbackUrl?: string }).playbackUrl,
+        path: playableUrl || (track as unknown as { playbackUrl?: string }).playbackUrl || track.path,
       };
 
       await audioEngineInstance.loadTrack(effectiveTrack, true);
       setCurrentTrack(track);
+
+      // Record play history & play stats asynchronously
+      PlayHistoryRepository.addRecord({
+        trackId: track.id,
+        title: track.title,
+        artist: track.artist,
+        playedAt: Date.now(),
+        playDuration: 0,
+        completed: false,
+        source: track.source,
+      }).catch(() => {});
+      TrackRepository.updatePlayStats(track.id).catch(() => {});
 
       sessionStartRef.current = {
         trackId: track.id,

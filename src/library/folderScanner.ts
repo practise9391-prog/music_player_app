@@ -3,6 +3,7 @@ import { db } from '../database/db';
 import { TrackRepository, FolderRepository } from '../database/repository';
 import { parseAudioFileMetadata, generateTrackIdentity } from './metadataParser';
 import { lyricsManagerInstance } from '../services/lyrics/LyricsManager';
+import { audioBlobStorageService } from '../services/storage/AudioBlobStorageService';
 
 const SUPPORTED_EXTENSIONS = new Set([
   'mp3',
@@ -130,7 +131,7 @@ export class FolderScanner {
           // Parse metadata offline
           const meta = await parseAudioFileMetadata(file, normalizedPath, file.name, modifiedAt);
           const trackId = generateTrackIdentity(normalizedPath, file.size, modifiedAt);
-          const audioUrl = URL.createObjectURL(file);
+          const audioUrl = await audioBlobStorageService.storeAudioBlob(trackId, file);
 
           const track: Track = {
             id: trackId,

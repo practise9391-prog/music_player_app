@@ -108,3 +108,11 @@ export interface LibraryStatistics {
   averageRating: number;
   ratedSongsCount: number;
 }
+
+export interface AudioBlobRecord {
+  id: string; // trackId
+  blob: Blob;
+  size: number;
+  mimeType: string;
+  updatedAt: number;
+}

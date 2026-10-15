@@ -51,6 +51,7 @@ import {
   Info,
   CheckCircle2,
   Compass,
+  Mic,
 } from 'lucide-react';
 import { musicDiscoveryService } from '../services/discovery/MusicDiscoveryService';
 import { SearchEngine } from '../services/search/SearchEngine';
@@ -72,6 +73,7 @@ interface HomePageProps {
   onOpenFullPlayer: () => void;
   onNavigate?: (route: any, playlistId?: string) => void;
   onOpenSearchModal?: () => void;
+  onOpenIdentifyModal?: () => void;
   searchQuery?: string;
 }
 
@@ -96,6 +98,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenFullPlayer,
   onNavigate,
   onOpenSearchModal,
+  onOpenIdentifyModal,
   searchQuery = '',
 }) => {
   const { playTrack, playPlaylist, shufflePlaylist, toggleFavorite, currentTrack, state } =
@@ -349,6 +352,15 @@ export const HomePage: React.FC<HomePageProps> = ({
               className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
             >
               <Search className="w-3.5 h-3.5 text-[var(--accent)]" /> Search
+            </button>
+          )}
+          {onOpenIdentifyModal && (
+            <button
+              onClick={onOpenIdentifyModal}
+              className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs font-semibold text-cyan-400 hover:bg-cyan-500/20 flex items-center gap-2 transition-all shadow-sm"
+              title="Identify Ambient Music (Shazam)"
+            >
+              <Mic className="w-3.5 h-3.5 text-cyan-400" /> Identify
             </button>
           )}
           {onNavigate && (

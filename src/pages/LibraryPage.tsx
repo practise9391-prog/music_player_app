@@ -645,6 +645,7 @@ export const LibraryPage: React.FC = () => {
             {[
               { id: 'all', label: 'All' },
               { id: 'favorites', label: 'Favorites (★)' },
+              { id: 'recently_played', label: 'Recently Played' },
               { id: 'recently_added', label: 'Recently Added' },
               { id: 'most_played', label: 'Most Played' },
               { id: 'lossless', label: 'Lossless (FLAC/WAV)' },
@@ -1189,9 +1190,19 @@ export const LibraryPage: React.FC = () => {
                     </div>
                   )}
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <div className="w-10 h-10 rounded-full btn-primary flex items-center justify-center shadow-xl">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (album.tracks.length > 0) {
+                          playPlaylist(album.tracks, 0);
+                        }
+                      }}
+                      className="w-10 h-10 rounded-full btn-primary flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+                      title="Play Album"
+                    >
                       <Play className="w-5 h-5 fill-current ml-0.5 text-[var(--btn-text)]" />
-                    </div>
+                    </button>
                     <button
                       type="button"
                       onClick={async (e) => {

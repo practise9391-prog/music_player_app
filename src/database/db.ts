@@ -21,6 +21,7 @@ import {
   BookmarkRecord,
   TrackResumePosition,
   ListeningSessionConfig,
+  AudioBlobRecord,
 } from '../types';
 
 export class MusicPlayerDatabase extends Dexie {
@@ -46,6 +47,7 @@ export class MusicPlayerDatabase extends Dexie {
   bookmarks!: Table<BookmarkRecord, number>;
   track_resume_positions!: Table<TrackResumePosition, string>;
   listening_sessions!: Table<ListeningSessionConfig, string>;
+  audio_blobs!: Table<AudioBlobRecord, string>;
 
   constructor() {
     super('NovaMusicPlayerDB');
@@ -299,6 +301,38 @@ export class MusicPlayerDatabase extends Dexie {
       bookmarks: '++id, trackId, position, createdAt',
       track_resume_positions: 'trackId, position, updatedAt',
       listening_sessions: 'id, name, type, createdAt',
+    });
+
+    // Schema v13 (Part 26: Local Audio Blobs Storage & High-Performance Offline Playback)
+    this.version(13).stores({
+      tracks:
+        'id, path, title, artist, album, genre, year, format, dateAdded, lastPlayedAt, isFavorite, rating, playCount, source, folderPath, isAvailable, modifiedAt, isDownloaded, downloadId',
+      play_history: '++id, trackId, playedAt, source',
+      online_history: 'id, url, title, artist, createdAt, lastPlayedAt, playCount, source, cached',
+      playlists: 'id, name, type, isFavorite, createdAt, updatedAt',
+      playlist_tracks: '++id, playlistId, trackId, position, addedAt',
+      favorites: '++id, trackId, addedAt',
+      entity_favorites: 'id, itemId, itemType, title, addedAt',
+      folders: 'id, path, enabled, dateAdded, lastScanned',
+      artwork_cache: 'id, createdAt',
+      player_state: 'key',
+      playback_sessions: '++id, trackId, startedAt, completed',
+      settings_store: 'key',
+      audio_presets: 'id, name, type, createdAt, updatedAt',
+      youtube_history:
+        'id, youtube_video_id, youtube_url, title, artist, last_played_at, play_count, is_favorite, cache_status, cache_last_used_at',
+      search_history: '++id, &query, timestamp, count',
+      lyrics:
+        'id, track_source_type, track_source_id, lyrics_type, language, source, is_synced, created_at, updated_at',
+      visualizer_presets: 'id, name, isBuiltin, createdAt, updatedAt',
+      downloads:
+        'id, source_id, source_type, status, priority, created_at, completed_at, target_track_id',
+      file_operations:
+        '++id, track_id, operation_type, timestamp, status',
+      bookmarks: '++id, trackId, position, createdAt',
+      track_resume_positions: 'trackId, position, updatedAt',
+      listening_sessions: 'id, name, type, createdAt',
+      audio_blobs: 'id, updatedAt',
     });
   }
 }

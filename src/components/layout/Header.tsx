@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Lock, Unlock, Terminal, Sliders, Shield } from 'lucide-react';
+import { Search, Lock, Unlock, Terminal, Sliders, Shield, Mic } from 'lucide-react';
 import { useNetwork } from '../../network/NetworkContext';
 import { useSettings } from '../../settings/SettingsContext';
 
@@ -10,6 +10,7 @@ interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onOpenSearchModal?: () => void;
+  onOpenIdentifyModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -19,6 +20,7 @@ export const Header: React.FC<HeaderProps> = ({
   searchQuery,
   onSearchChange,
   onOpenSearchModal,
+  onOpenIdentifyModal,
 }) => {
   const { networkState } = useNetwork();
   const { settings, updateSettings } = useSettings();
@@ -79,6 +81,18 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </button>
+
+        {/* Song Identifier (Shazam) */}
+        {onOpenIdentifyModal && (
+          <button
+            onClick={onOpenIdentifyModal}
+            className="flex items-center gap-1.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-full bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-xs font-semibold transition-all shadow-sm"
+            title="Identify Ambient Song (Acoustic Radar)"
+          >
+            <Mic className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Identify</span>
+          </button>
+        )}
 
         {/* Developer Telemetry Button */}
         <button

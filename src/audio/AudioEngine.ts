@@ -73,7 +73,6 @@ export class AudioEngine {
   private initAudioElement() {
     if (typeof Audio === 'undefined') return;
     this.audioElement = new Audio();
-    this.audioElement.crossOrigin = 'anonymous';
     this.audioElement.preload = 'metadata';
     // Maintain natural pitch when changing playback speed (0.5x - 2.0x)
     if ('preservesPitch' in this.audioElement) {
@@ -96,6 +95,7 @@ export class AudioEngine {
 
     this.audioElement.addEventListener('play', () => {
       this.status = 'playing';
+      this.error = null;
       this.emit('PLAY_STARTED', this.currentTrack);
       this.notify();
     });
@@ -122,8 +122,27 @@ export class AudioEngine {
     });
 
     this.audioElement.addEventListener('error', () => {
+      const mediaErr = this.audioElement?.error;
+      let msg = 'Playback error occurred.';
+      if (mediaErr) {
+        switch (mediaErr.code) {
+          case 1: // MEDIA_ERR_ABORTED
+            msg = 'Audio playback aborted.';
+            break;
+          case 2: // MEDIA_ERR_NETWORK
+            msg = 'Network error while loading audio.';
+            break;
+          case 3: // MEDIA_ERR_DECODE
+            msg = 'Audio decoding error: format corrupted or unsupported.';
+            break;
+          case 4: // MEDIA_ERR_SRC_NOT_SUPPORTED
+            msg = 'Audio file format or URL is not accessible.';
+            break;
+        }
+      }
       this.status = 'error';
-      this.error = this.audioElement?.error?.message || 'Playback error occurred.';
+      this.error = msg;
+      console.warn('[AudioEngine] HTMLAudioElement error:', msg, mediaErr);
       this.emit('PLAYBACK_ERROR', this.error);
       this.notify();
     });
@@ -320,6 +339,21 @@ export class AudioEngine {
 
     if (this.audioElement) {
       const streamUrl = track.playbackUrl || track.path;
+      const isRemoteHttp =
+        (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) &&
+        !streamUrl.includes('localhost') &&
+        !streamUrl.includes('127.0.0.1');
+
+      if (isRemoteHttp) {
+        this.audioElement.crossOrigin = 'anonymous';
+      } else {
+        if (typeof this.audioElement.removeAttribute === 'function') {
+          this.audioElement.removeAttribute('crossorigin');
+        } else {
+          this.audioElement.crossOrigin = null;
+        }
+      }
+
       this.audioElement.src = streamUrl;
       this.audioElement.playbackRate = this.playbackRate;
       this.audioElement.currentTime = initialPosition;
@@ -331,13 +365,17 @@ export class AudioEngine {
         try {
           await this.audioElement.play();
           this.status = 'playing';
+          this.error = null;
           if (this.fadeInDuration > 0) {
             this.fadeIn(this.fadeInDuration).catch(() => {});
           }
         } catch (e: unknown) {
           const err = e as Error;
           if (err.name !== 'AbortError') {
-            this.status = 'paused';
+            console.warn('[AudioEngine] Playback start error for track:', track.title, err);
+            this.error = `Playback error: ${err.message}`;
+            this.status = 'error';
+            this.emit('PLAYBACK_ERROR', this.error);
           }
         }
       } else {
