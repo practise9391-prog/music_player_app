@@ -41,7 +41,9 @@ import {
   ListMusic,
   Plus,
   Check,
+  RefreshCw,
 } from 'lucide-react';
+import { nativeMediaStoreService } from '../services/android/NativeMediaStoreService';
 
 export type HomeTab = 'songs' | 'videos' | 'artists' | 'albums' | 'folders';
 export type QuickFilter = 'all' | 'favorites' | 'offline' | 'lossless' | 'recent';
@@ -148,7 +150,11 @@ export const HomePage: React.FC<HomePageProps> = ({
 
     const handleUpdated = () => loadData();
     window.addEventListener('nova-playlists-updated', handleUpdated);
-    return () => window.removeEventListener('nova-playlists-updated', handleUpdated);
+    window.addEventListener('nova-library-updated', handleUpdated);
+    return () => {
+      window.removeEventListener('nova-playlists-updated', handleUpdated);
+      window.removeEventListener('nova-library-updated', handleUpdated);
+    };
   }, []);
 
   // Filtered and sorted songs
@@ -401,6 +407,21 @@ export const HomePage: React.FC<HomePageProps> = ({
         {/* Sort and Options */}
         <div className="relative flex items-center gap-1.5">
           <button
+            onClick={async () => {
+              if (nativeMediaStoreService.isNative()) {
+                await nativeMediaStoreService.scanAndImport();
+                loadData();
+              } else {
+                loadData();
+              }
+            }}
+            className="p-2 rounded-xl text-[var(--text-muted)] hover:text-purple-400 hover:bg-[var(--surface-secondary)] transition-colors"
+            title="Scan & Sync Device Music (Internal & SD Card)"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
+
+          <button
             onClick={() => setSortAsc(!sortAsc)}
             className="p-2 rounded-xl text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
             title="Toggle Sort Order"
@@ -462,18 +483,25 @@ export const HomePage: React.FC<HomePageProps> = ({
                   Scan a music folder from your phone to load all your songs automatically.
                 </p>
               </div>
-              <div className="flex items-center justify-center gap-3 pt-2">
+              <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <button
-                  onClick={onOpenFolder}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
+                  onClick={async () => {
+                    if (nativeMediaStoreService.isNative()) {
+                      await nativeMediaStoreService.scanAndImport();
+                      loadData();
+                    } else if (onOpenFolder) {
+                      onOpenFolder();
+                    }
+                  }}
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  <FolderPlus className="w-4 h-4" /> Select Music Folder
+                  <RefreshCw className="w-4 h-4" /> Auto Scan Device Music
                 </button>
                 <button
-                  onClick={onAddMusic}
-                  className="px-4 py-2 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] text-white text-xs font-bold border border-[var(--border)] transition-all flex items-center gap-2"
+                  onClick={onOpenFolder}
+                  className="px-4 py-2.5 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] text-[var(--text-secondary)] hover:text-white text-xs font-medium transition-all border border-[var(--border)] flex items-center gap-2"
                 >
-                  <Plus className="w-4 h-4" /> Pick Audio Files
+                  <FolderPlus className="w-4 h-4" /> Pick Folder
                 </button>
               </div>
             </div>

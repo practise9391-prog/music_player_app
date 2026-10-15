@@ -191,6 +191,10 @@ export const LibraryPage: React.FC = () => {
 
   useEffect(() => {
     loadData();
+
+    const handleLibraryUpdate = () => loadData();
+    window.addEventListener('nova-library-updated', handleLibraryUpdate);
+    return () => window.removeEventListener('nova-library-updated', handleLibraryUpdate);
   }, [loadData]);
 
   // Restore saved view and column preferences

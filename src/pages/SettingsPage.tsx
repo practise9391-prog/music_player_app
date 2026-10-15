@@ -57,8 +57,9 @@ import {
   Terminal,
   Languages,
 } from 'lucide-react';
-import { androidBridgeInstance } from '../services/android/AndroidBridge';
+import { androidBridgeInstance, AndroidPermissionStatus } from '../services/android/AndroidBridge';
 import { mediaStoreSyncServiceInstance } from '../services/android/MediaStoreSyncService';
+import { nativeMediaStoreService } from '../services/android/NativeMediaStoreService';
 import { VisualizerLabModal } from '../components/visualizer/VisualizerLabModal';
 import { LibraryDiagnosticsModal } from '../components/diagnostics/LibraryDiagnosticsModal';
 import { useTranslation } from '../services/i18n/I18nService';
@@ -217,6 +218,20 @@ export const SettingsPage: React.FC = () => {
   const handleSyncMediaStore = async () => {
     setIsSyncingMediaStore(true);
     try {
+      if (nativeMediaStoreService.isNative()) {
+        const res = await nativeMediaStoreService.scanAndImport();
+        if (res.total > 0) {
+          setMediaStoreSyncResult({
+            added: res.added,
+            updated: res.updated,
+            markedUnavailable: 0,
+            restored: 0,
+            durationMs: 800,
+          });
+          window.dispatchEvent(new CustomEvent('nova-library-updated'));
+        }
+        return;
+      }
       const files = await androidBridgeInstance.selectAudioFiles();
       if (files.length === 0) {
         notificationService.info('No Files Selected', 'Select audio files to sync into the media library.');
@@ -268,6 +283,18 @@ export const SettingsPage: React.FC = () => {
   };
 
   const handleRequestStoragePermission = async () => {
+    if (nativeMediaStoreService.isNative()) {
+      const granted = await nativeMediaStoreService.requestPermission();
+      const status: AndroidPermissionStatus = granted ? 'granted' : 'denied';
+      setPermissionStatus(status);
+      await updateSettings({ androidStoragePermissionRequested: true });
+      if (granted) {
+        notificationService.success('Permission Granted', 'Audio storage access enabled.');
+        await nativeMediaStoreService.scanAndImport();
+        window.dispatchEvent(new CustomEvent('nova-library-updated'));
+      }
+      return;
+    }
     const status = await androidBridgeInstance.requestStoragePermission();
     setPermissionStatus(status);
     await updateSettings({ androidStoragePermissionRequested: true });

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Music, Check, X, AlertCircle, Settings } from 'lucide-react';
 import { androidBridgeInstance, AndroidPermissionStatus } from '../../services/android/AndroidBridge';
+import { nativeMediaStoreService } from '../../services/android/NativeMediaStoreService';
 
 interface StoragePermissionModalProps {
   isOpen: boolean;
@@ -24,6 +25,19 @@ export const StoragePermissionModal: React.FC<StoragePermissionModalProps> = ({
   const handleRequest = async () => {
     setIsRequesting(true);
     try {
+      if (nativeMediaStoreService.isNative()) {
+        const granted = await nativeMediaStoreService.requestPermission();
+        if (granted) {
+          setStatus('granted');
+          onPermissionGranted();
+          await nativeMediaStoreService.scanAndImport();
+          window.dispatchEvent(new CustomEvent('nova-library-updated'));
+          onClose();
+        } else {
+          setStatus('denied');
+        }
+        return;
+      }
       const res = await androidBridgeInstance.requestStoragePermission();
       setStatus(res);
       if (res === 'granted') {
@@ -38,6 +52,10 @@ export const StoragePermissionModal: React.FC<StoragePermissionModalProps> = ({
   };
 
   const handleOpenSettings = () => {
+    if (nativeMediaStoreService.isNative()) {
+      nativeMediaStoreService.openSettings();
+      return;
+    }
     androidBridgeInstance.openSystemSettings();
   };
 

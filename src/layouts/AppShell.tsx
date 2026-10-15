@@ -39,6 +39,7 @@ import { DownloadsPage } from '../pages/DownloadsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { GlobalSearchModal } from '../components/search/GlobalSearchModal';
 import { OpeningSplash } from '../components/common/OpeningSplash';
+import { nativeMediaStoreService } from '../services/android/NativeMediaStoreService';
 
 import { backNavigationService } from '../services/navigation/BackNavigationService';
 
@@ -102,6 +103,13 @@ export const AppShell: React.FC = () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [settings.appLockEnabled, settings.appLockPinHash, settings.appLockTimeoutMinutes]);
+
+  // Automatic Android MediaStore discovery on launch (zero manual selection)
+  useEffect(() => {
+    nativeMediaStoreService.autoSyncOnStartup().then(() => {
+      window.dispatchEvent(new CustomEvent('nova-library-updated'));
+    });
+  }, []);
 
   // UI Shortcuts (Full player and search focus)
   useEffect(() => {
