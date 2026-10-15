@@ -16,6 +16,7 @@ import {
   Clock,
   Flame,
   Download,
+  X,
 } from 'lucide-react';
 import { useNetwork } from '../../network/NetworkContext';
 import { PlaylistRecord } from '../../types';
@@ -37,6 +38,8 @@ interface SidebarProps {
   onNavigate: (route: NavRoute, playlistId?: string) => void;
   onOpenNetworkModal: () => void;
   onCreatePlaylist?: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -45,6 +48,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onNavigate,
   onOpenNetworkModal,
   onCreatePlaylist,
+  isOpen = false,
+  onClose,
 }) => {
   const { networkState } = useNetwork();
   const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
@@ -101,43 +106,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   };
 
-  return (
-    <aside className="hidden md:flex w-64 h-full bg-[var(--sidebar-bg)] border-r border-[var(--border)] flex-col justify-between p-4 shrink-0 select-none overflow-hidden">
-      <div className="flex flex-col min-h-0 flex-1 space-y-5">
-        {/* App Logo & Header */}
-        <div className="flex items-center gap-3 px-2 py-1 shrink-0">
-          <div className="w-9 h-9 rounded-xl btn-primary flex items-center justify-center shadow-md">
-            <Disc3 className="w-5 h-5 text-[var(--btn-text)]" />
-          </div>
-          <div>
-            <h1 className="text-base font-extrabold tracking-tight text-[var(--text-primary)]">
-              NOVA MUSIC
-            </h1>
-            <p className="text-[10px] tracking-widest text-[var(--text-muted)] uppercase font-mono">
-              OFFLINE AUDIO
-            </p>
-          </div>
-        </div>
+  const handleItemClick = (route: NavRoute, playlistId?: string) => {
+    onNavigate(route, playlistId);
+    if (onClose) {
+      onClose();
+    }
+  };
 
-        {/* Primary Library Navigation */}
-        <div className="shrink-0 space-y-1">
-          <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-            LIBRARY
+  return (
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm md:hidden animate-fade-in"
+        />
+      )}
+
+      {/* Sidebar Panel */}
+      <aside
+        className={`${
+          isOpen
+            ? 'fixed inset-y-0 left-0 z-50 flex w-72 shadow-2xl'
+            : 'hidden md:flex w-64'
+        } h-full bg-[var(--sidebar-bg)] border-r border-[var(--border)] flex-col justify-between p-4 shrink-0 select-none overflow-hidden transition-all duration-200`}
+      >
+        <div className="flex flex-col min-h-0 flex-1 space-y-5">
+          {/* App Logo & Header */}
+          <div className="flex items-center justify-between px-2 py-1 shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl overflow-hidden shadow-md border border-purple-500/30 shrink-0">
+                <img src="/icon.png" alt="SoundFlow" className="w-full h-full object-cover" />
+              </div>
+              <div>
+                <h1 className="text-base font-extrabold tracking-tight text-[var(--text-primary)]">
+                  SOUNDFLOW
+                </h1>
+                <p className="text-[10px] tracking-widest text-[var(--text-muted)] uppercase font-mono">
+                  OFFLINE AUDIO
+                </p>
+              </div>
+            </div>
+
+            {/* Mobile close button */}
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-secondary)] md:hidden transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
-          <nav className="space-y-1">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = currentRoute === item.route && (!selectedPlaylistId || item.route !== 'playlists');
-              return (
-                <button
-                  key={item.route}
-                  onClick={() => onNavigate(item.route)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-[var(--radius)] text-sm font-medium transition-all duration-150 ${
-                    isActive
-                      ? 'bg-[var(--surface-secondary)] text-[var(--accent)] font-semibold border border-[var(--border)] shadow-sm'
-                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]'
-                  }`}
-                >
+
+          {/* Primary Library Navigation */}
+          <div className="shrink-0 space-y-1">
+            <div className="px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+              LIBRARY
+            </div>
+            <nav className="space-y-1">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = currentRoute === item.route && (!selectedPlaylistId || item.route !== 'playlists');
+                return (
+                  <button
+                    key={item.route}
+                    onClick={() => handleItemClick(item.route)}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-[var(--radius)] text-sm font-medium transition-all duration-150 ${
+                      isActive
+                        ? 'bg-[var(--surface-secondary)] text-[var(--accent)] font-semibold border border-[var(--border)] shadow-sm'
+                        : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]'
+                    }`}
+                  >
                   <Icon
                     className={`w-4 h-4 shrink-0 ${
                       isActive ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
@@ -261,5 +301,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
     </aside>
+  </>
   );
 };

@@ -38,31 +38,33 @@ class ArtworkCacheService {
       return this.memCache.get(id)!;
     }
 
+    // Fast, reliable conversion of Uint8Array bytes to Base64 Data URL
     try {
-      const blob = new Blob([imageBytes as BlobPart], { type: mimeType });
-      const optimizedDataUrl = await this.createOptimizedThumbnail(blob, maxDimension);
+      let binary = '';
+      const len = imageBytes.byteLength;
+      const chunkSize = 8192;
+      for (let i = 0; i < len; i += chunkSize) {
+        const chunk = imageBytes.subarray(i, Math.min(i + chunkSize, len));
+        binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+      }
+      const dataUrl = `data:${mimeType};base64,${btoa(binary)}`;
 
       const record: ArtworkCacheRecord = {
         id,
-        dataUrl: optimizedDataUrl,
-        mimeType: 'image/jpeg',
+        dataUrl,
+        mimeType: mimeType || 'image/jpeg',
         width: maxDimension,
         height: maxDimension,
         createdAt: Date.now(),
       };
 
-      await db.artwork_cache.put(record);
-      this.memCache.set(id, optimizedDataUrl);
-      return optimizedDataUrl;
-    } catch {
-      // If canvas / image decoding fails in test or headless env, store base64 direct
-      let binary = '';
-      for (let i = 0; i < imageBytes.byteLength; i++) {
-        binary += String.fromCharCode(imageBytes[i]);
-      }
-      const dataUrl = `data:${mimeType};base64,${btoa(binary)}`;
+      // Persist in IndexedDB in background
+      db.artwork_cache.put(record).catch(() => {});
       this.memCache.set(id, dataUrl);
       return dataUrl;
+    } catch (err) {
+      console.warn('[ArtworkCache] Direct base64 conversion fallback failed:', err);
+      return '';
     }
   }
 
@@ -134,3 +136,45 @@ class ArtworkCacheService {
 }
 
 export const artworkCache = new ArtworkCacheService();
+
+/**
+ * Deterministically generates a vibrant neon geometric album art SVG data URL
+ * with acoustic chevron waves matching the reference app when a track lacks embedded artwork.
+ */
+export function generateVibrantCover(title = 'Track', artist = ''): string {
+  const seed = (title + (artist || '')).trim().toLowerCase();
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  const palettes = [
+    ['#7c3aed', '#db2777'],
+    ['#0284c7', '#2563eb'],
+    ['#059669', '#10b981'],
+    ['#ea580c', '#f59e0b'],
+    ['#9333ea', '#4f46e5'],
+    ['#e11d48', '#f43f5e'],
+  ];
+  const [c1, c2] = palettes[Math.abs(hash) % palettes.length];
+  const initial = (title.replace(/^[^a-zA-Z0-9]+/, '') || 'M').charAt(0).toUpperCase();
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+    <defs>
+      <linearGradient id="g_${Math.abs(hash)}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${c1}" />
+        <stop offset="100%" stop-color="${c2}" />
+      </linearGradient>
+      <pattern id="p_${Math.abs(hash)}" width="24" height="24" patternUnits="userSpaceOnUse">
+        <path d="M 0 12 L 12 0 L 24 12 L 12 24 Z" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.5"/>
+      </pattern>
+    </defs>
+    <rect width="200" height="200" rx="20" fill="url(#g_${Math.abs(hash)})"/>
+    <rect width="200" height="200" rx="20" fill="url(#p_${Math.abs(hash)})"/>
+    <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2"/>
+    <circle cx="100" cy="100" r="42" fill="rgba(0,0,0,0.28)"/>
+    <text x="100" y="112" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-size="34" font-weight="900" fill="#ffffff" text-anchor="middle">${initial}</text>
+  </svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}

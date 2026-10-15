@@ -4,6 +4,7 @@ import { Track } from '../../types';
 export class AudioBlobStorageService {
   private static instance: AudioBlobStorageService | null = null;
   private activeBlobUrls: Map<string, string> = new Map();
+  private fileRegistry: Map<string, File | Blob> = new Map();
 
   private constructor() {}
 
@@ -15,16 +16,19 @@ export class AudioBlobStorageService {
   }
 
   /**
+   * Registers a file reference in memory for on-demand playback URL generation.
+   */
+  public registerFile(trackId: string, file: File | Blob): void {
+    this.fileRegistry.set(trackId, file);
+  }
+
+  /**
    * Caches and registers an in-memory object URL for an active file/blob.
    */
   public registerBlobUrl(trackId: string, blob: Blob | File): string {
     const existing = this.activeBlobUrls.get(trackId);
     if (existing) {
-      try {
-        URL.revokeObjectURL(existing);
-      } catch {
-        // ignore
-      }
+      return existing;
     }
     const newUrl = URL.createObjectURL(blob);
     this.activeBlobUrls.set(trackId, newUrl);
@@ -35,18 +39,19 @@ export class AudioBlobStorageService {
    * Stores the raw audio file Blob in IndexedDB and registers an immediate playback URL.
    */
   public async storeAudioBlob(trackId: string, blob: Blob | File): Promise<string> {
+    this.registerFile(trackId, blob);
     const playbackUrl = this.registerBlobUrl(trackId, blob);
-    try {
-      await db.audio_blobs.put({
-        id: trackId,
-        blob,
-        size: blob.size,
-        mimeType: blob.type || 'audio/mpeg',
-        updatedAt: Date.now(),
-      });
-    } catch (err) {
-      console.warn(`[AudioBlobStorage] Could not persist audio blob for ${trackId}:`, err);
-    }
+    // Persist asynchronously in background so large bulk scans never block or exceed quota
+    db.audio_blobs.put({
+      id: trackId,
+      blob,
+      size: blob.size,
+      mimeType: blob.type || 'audio/mpeg',
+      updatedAt: Date.now(),
+    }).catch((err) => {
+      // Safe fallback - in-memory blob or file URL will be used
+      console.warn(`[AudioBlobStorage] Background audio blob persistence note for ${trackId}:`, err);
+    });
     return playbackUrl;
   }
 
@@ -68,6 +73,12 @@ export class AudioBlobStorageService {
     const activeUrl = this.activeBlobUrls.get(track.id);
     if (activeUrl) {
       return activeUrl;
+    }
+
+    // 2b. Registered file reference
+    const registeredFile = this.fileRegistry.get(track.id);
+    if (registeredFile) {
+      return this.registerBlobUrl(track.id, registeredFile);
     }
 
     // 3. Stored IndexedDB audio blob

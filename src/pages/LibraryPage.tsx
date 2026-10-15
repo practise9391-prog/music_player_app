@@ -54,6 +54,7 @@ import {
   SortDirection,
   SortOptions,
 } from '../../src/services/filter/FilterEngine';
+import { generateVibrantCover } from '../library/artworkCache';
 import {
   Music2,
   Disc,
@@ -1070,11 +1071,23 @@ export const LibraryPage: React.FC = () => {
                           </td>
                           {visibleColumns.title && (
                             <td className="p-3 font-semibold text-[var(--text-primary)]">
-                              <div className="truncate flex items-center gap-2">
-                                <span>{track.title}</span>
-                                {track.isFavorite && (
-                                  <Heart className="w-3 h-3 text-rose-500 fill-current shrink-0" />
-                                )}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 bg-[var(--surface-secondary)] border border-[var(--border-subtle)] relative">
+                                  <img
+                                    src={track.coverArtUrl || generateVibrantCover(track.title, track.artist)}
+                                    alt={track.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = generateVibrantCover(track.title, track.artist);
+                                    }}
+                                  />
+                                </div>
+                                <div className="truncate flex items-center gap-1.5 min-w-0 flex-1">
+                                  <span className="truncate">{track.title}</span>
+                                  {track.isFavorite && (
+                                    <Heart className="w-3 h-3 text-rose-500 fill-current shrink-0 ml-0.5" />
+                                  )}
+                                </div>
                               </div>
                             </td>
                           )}

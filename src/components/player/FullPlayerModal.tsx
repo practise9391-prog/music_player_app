@@ -42,6 +42,7 @@ import { AudioFormatInfoModal } from '../modals/AudioFormatInfoModal';
 import { SleepTimerModal } from './SleepTimerModal';
 import { DrivingModeModal } from './DrivingModeModal';
 import { BookmarksDrawer } from './BookmarksDrawer';
+import { generateVibrantCover } from '../../library/artworkCache';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || seconds < 0) return '00:00';
@@ -366,33 +367,15 @@ export const FullPlayerModal: React.FC = () => {
             />
           </div>
         ) : (
-          <div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center my-2">
-            {/* Outer Glowing Visualizer Ring */}
-            <div
-              className={`absolute inset-0 rounded-full border-2 border-[var(--accent)]/30 ${
-                isPlaying ? 'animate-pulse scale-105' : 'scale-100'
-              } transition-all duration-700`}
-              style={{
-                boxShadow: isPlaying ? '0 0 45px var(--accent-glow)' : 'none',
+          <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-2xl border border-purple-500/30 my-3 bg-black/40">
+            <img
+              src={currentTrack?.coverArtUrl || generateVibrantCover(currentTrack?.title || 'Track', currentTrack?.artist)}
+              alt="Album Artwork"
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = generateVibrantCover(currentTrack?.title || 'Track', currentTrack?.artist);
               }}
             />
-
-            <div className="absolute inset-4 rounded-full border border-[var(--border)] flex items-center justify-center bg-[var(--surface-card)] shadow-inner overflow-hidden">
-              {currentTrack?.coverArtUrl ? (
-                <img
-                  src={currentTrack.coverArtUrl}
-                  alt="Album Cover"
-                  className={`w-full h-full object-cover ${isPlaying ? 'rotate-1' : ''}`}
-                />
-              ) : (
-                <div className="flex flex-col items-center justify-center text-[var(--accent)] gap-3">
-                  <Waves className={`w-16 h-16 ${isPlaying ? 'animate-bounce' : ''}`} />
-                  <span className="font-mono text-xs tracking-widest uppercase text-[var(--text-muted)]">
-                    AUDIO VISUAL
-                  </span>
-                </div>
-              )}
-            </div>
           </div>
         )}
 

@@ -131,7 +131,8 @@ export class FolderScanner {
           // Parse metadata offline
           const meta = await parseAudioFileMetadata(file, normalizedPath, file.name, modifiedAt);
           const trackId = generateTrackIdentity(normalizedPath, file.size, modifiedAt);
-          const audioUrl = await audioBlobStorageService.storeAudioBlob(trackId, file);
+          audioBlobStorageService.registerFile(trackId, file);
+          const audioUrl = audioBlobStorageService.registerBlobUrl(trackId, file);
 
           const track: Track = {
             id: trackId,
@@ -191,12 +192,23 @@ export class FolderScanner {
           } else {
             progress.newTracks++;
           }
+
+          // Chunk-save to database every 40 tracks to prevent huge memory spikes
+          if (tracksToSave.length >= 40) {
+            await TrackRepository.saveBatch([...tracksToSave]);
+            tracksToSave.length = 0; // Clear memory
+          }
         } catch (err: unknown) {
           const e = err as Error;
           progress.errors.push({
             path: normalizedPath,
             reason: e?.message || 'Failed to extract metadata',
           });
+        }
+
+        // Yield execution to the browser engine every 15 files to prevent WebView freezing/OOM
+        if (i % 15 === 0) {
+          await new Promise((r) => setTimeout(r, 10));
         }
 
         notify();
@@ -211,9 +223,10 @@ export class FolderScanner {
         }
       }
 
-      // 3. Batch save new and updated tracks into SQLite / IndexedDB
+      // 3. Save any remaining tracks into SQLite / IndexedDB
       if (tracksToSave.length > 0) {
         await TrackRepository.saveBatch(tracksToSave);
+        tracksToSave.length = 0;
       }
 
       // 4. Update folder record scan stats

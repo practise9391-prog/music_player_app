@@ -4,6 +4,7 @@ import { YouTubeHistoryRepository, PlayHistoryRepository, TrackRepository } from
 import { CacheManager } from '../services/youtube/CacheManager';
 import { usePlayer } from '../player/PlayerContext';
 import { notificationService } from '../services/errorService';
+import { generateVibrantCover } from '../library/artworkCache';
 import { YouTubeHistoryCard } from '../components/youtube/YouTubeHistoryCard';
 import { CacheDetailsModal } from '../components/youtube/CacheDetailsModal';
 import {
@@ -30,6 +31,7 @@ export const HistoryPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'local' | 'youtube'>('local');
   const [youtubeHistory, setYoutubeHistory] = useState<YouTubeHistoryRecord[]>([]);
   const [playHistory, setPlayHistory] = useState<PlayHistoryRecord[]>([]);
+  const [tracksById, setTracksById] = useState<Map<string, Track>>(new Map());
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('recent');
   const [filterBy, setFilterBy] = useState<FilterOption>('all');
@@ -38,14 +40,104 @@ export const HistoryPage: React.FC = () => {
 
   const loadData = async () => {
     const yt = await YouTubeHistoryRepository.getAll();
-    const local = await PlayHistoryRepository.getRecent(100);
+    const local = await PlayHistoryRepository.getRecent(500);
+    const allTracks = await TrackRepository.getAll();
+    const tMap = new Map<string, Track>();
+    allTracks.forEach((t) => tMap.set(t.id, t));
+
     setYoutubeHistory(yt);
     setPlayHistory(local);
+    setTracksById(tMap);
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Daily de-duplicated and sorted Local Play History (Requirement 11)
+  const groupedLocalHistory = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const dayMap = new Map<string, { label: string; dateSort: number; records: PlayHistoryRecord[] }>();
+
+    playHistory.forEach((rec) => {
+      const d = new Date(rec.playedAt);
+      const dayStart = new Date(d);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayKey = dayStart.toISOString().split('T')[0];
+
+      let label = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      if (dayStart.getTime() === today.getTime()) {
+        label = 'Today';
+      } else if (dayStart.getTime() === yesterday.getTime()) {
+        label = 'Yesterday';
+      }
+
+      let group = dayMap.get(dayKey);
+      if (!group) {
+        group = { label, dateSort: dayStart.getTime(), records: [] };
+        dayMap.set(dayKey, group);
+      }
+      group.records.push(rec);
+    });
+
+    const result: {
+      label: string;
+      dateSort: number;
+      items: {
+        trackId: string;
+        title: string;
+        artist: string;
+        source?: 'local' | 'online';
+        lastPlayedAt: number;
+        playCountToday: number;
+        track?: Track;
+      }[];
+    }[] = [];
+
+    dayMap.forEach((group) => {
+      const trackAgg = new Map<string, {
+        trackId: string;
+        title: string;
+        artist: string;
+        source?: 'local' | 'online';
+        lastPlayedAt: number;
+        playCountToday: number;
+        track?: Track;
+      }>();
+
+      group.records.forEach((rec) => {
+        const key = rec.trackId || `${rec.title}:::${rec.artist}`;
+        const existing = trackAgg.get(key);
+        if (existing) {
+          existing.playCountToday += 1;
+          if (rec.playedAt > existing.lastPlayedAt) {
+            existing.lastPlayedAt = rec.playedAt;
+          }
+        } else {
+          trackAgg.set(key, {
+            trackId: rec.trackId,
+            title: rec.title,
+            artist: rec.artist,
+            source: rec.source,
+            lastPlayedAt: rec.playedAt,
+            playCountToday: 1,
+            track: tracksById.get(rec.trackId),
+          });
+        }
+      });
+
+      // Sort items descending by lastPlayedAt (most recently replayed appears on TOP!)
+      const items = Array.from(trackAgg.values()).sort((a, b) => b.lastPlayedAt - a.lastPlayedAt);
+      result.push({ label: group.label, dateSort: group.dateSort, items });
+    });
+
+    result.sort((a, b) => b.dateSort - a.dateSort);
+    return result;
+  }, [playHistory, tracksById]);
 
   // Filter & Search
   const filteredAndSorted = useMemo(() => {
@@ -267,8 +359,8 @@ export const HistoryPage: React.FC = () => {
             )}
           </div>
 
-          <div className="space-y-2">
-            {playHistory.length === 0 ? (
+          <div className="space-y-6">
+            {groupedLocalHistory.length === 0 ? (
               <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-2">
                 <HistoryIcon className="w-8 h-8 text-[var(--text-muted)] mx-auto opacity-50" />
                 <div className="text-sm font-semibold text-[var(--text-primary)]">No Playback History Yet</div>
@@ -277,46 +369,84 @@ export const HistoryPage: React.FC = () => {
                 </p>
               </div>
             ) : (
-              playHistory.map((item, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handlePlayLocalTrack(item)}
-                  className="flex items-center justify-between p-3.5 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs cursor-pointer group transition-colors shadow-sm"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePlayLocalTrack(item);
-                      }}
-                      className="w-8 h-8 rounded-lg bg-[var(--surface-secondary)] group-hover:bg-[var(--accent)] text-[var(--text-muted)] group-hover:text-[var(--btn-text)] flex items-center justify-center transition-colors shrink-0"
-                      title="Replay this track"
-                    >
-                      <Play className="w-4 h-4 fill-current ml-0.5" />
-                    </button>
-                    <div className="min-w-0">
-                      <div className="font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
-                        {item.title}
-                      </div>
-                      <div className="text-[11px] text-[var(--text-secondary)] truncate">
-                        {item.artist}
-                      </div>
-                    </div>
+              groupedLocalHistory.map((group) => (
+                <div key={group.label} className="space-y-2.5">
+                  <div className="flex items-center justify-between px-1">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-2">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>{group.label}</span>
+                      <span className="text-[10px] text-[var(--text-muted)] font-mono font-normal">
+                        ({group.items.length} song{group.items.length !== 1 ? 's' : ''})
+                      </span>
+                    </h3>
                   </div>
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
-                        item.source === 'online'
-                          ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
-                          : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                      }`}
-                    >
-                      {item.source === 'online' ? 'Online' : 'Local'}
-                    </span>
-                    <div className="text-[10px] text-[var(--text-muted)] font-mono">
-                      {new Date(item.playedAt).toLocaleDateString()} {new Date(item.playedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
+                  <div className="space-y-2">
+                    {group.items.map((item) => {
+                      const coverUrl =
+                        item.track?.coverArtUrl ||
+                        generateVibrantCover(item.title, item.artist);
+
+                      return (
+                        <div
+                          key={item.trackId || `${item.title}-${item.lastPlayedAt}`}
+                          onClick={() => handlePlayLocalTrack(item as unknown as PlayHistoryRecord)}
+                          className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs cursor-pointer group transition-all shadow-sm hover:border-[var(--accent)]"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            {/* Artwork Thumbnail */}
+                            <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 relative bg-[var(--surface-secondary)] border border-[var(--border-subtle)]">
+                              <img
+                                src={coverUrl}
+                                alt={item.title}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = generateVibrantCover(item.title, item.artist);
+                                }}
+                              />
+                              <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <Play className="w-4 h-4 text-white fill-current" />
+                              </div>
+                            </div>
+
+                            <div className="min-w-0 flex-1">
+                              <div className="font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)] text-sm">
+                                {item.title}
+                              </div>
+                              <div className="text-xs text-[var(--text-secondary)] truncate">
+                                {item.artist} {item.track?.album ? `• ${item.track.album}` : ''}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 shrink-0 ml-3">
+                            {/* Play count badge for today / this day */}
+                            {item.playCountToday > 1 && (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                                {item.playCountToday} plays
+                              </span>
+                            )}
+
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                item.source === 'online'
+                                  ? 'bg-purple-500/15 text-purple-400 border-purple-500/30'
+                                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                              }`}
+                            >
+                              {item.source === 'online' ? 'Online' : 'Local'}
+                            </span>
+
+                            <div className="text-[11px] text-[var(--text-muted)] font-mono">
+                              {new Date(item.lastPlayedAt).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))

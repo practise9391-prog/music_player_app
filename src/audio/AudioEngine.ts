@@ -344,14 +344,11 @@ export class AudioEngine {
         !streamUrl.includes('localhost') &&
         !streamUrl.includes('127.0.0.1');
 
-      if (isRemoteHttp) {
-        this.audioElement.crossOrigin = 'anonymous';
+      // Avoid forcing crossOrigin anonymous on remote media streams to prevent CORS failures
+      if (typeof this.audioElement.removeAttribute === 'function') {
+        this.audioElement.removeAttribute('crossorigin');
       } else {
-        if (typeof this.audioElement.removeAttribute === 'function') {
-          this.audioElement.removeAttribute('crossorigin');
-        } else {
-          this.audioElement.crossOrigin = null;
-        }
+        this.audioElement.crossOrigin = null;
       }
 
       this.audioElement.src = streamUrl;

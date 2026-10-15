@@ -13,6 +13,7 @@ interface HeaderProps {
   onOpenIdentifyModal?: () => void;
   canGoBack?: boolean;
   onBack?: () => void;
+  onToggleSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -25,6 +26,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenIdentifyModal,
   canGoBack,
   onBack,
+  onToggleSidebar,
 }) => {
   const { networkState } = useNetwork();
   const { settings, updateSettings } = useSettings();
@@ -36,8 +38,9 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="h-14 md:h-16 px-2.5 sm:px-4 md:px-6 bg-[var(--background)]/85 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between gap-1.5 sm:gap-3 md:gap-4 select-none shrink-0">
       {/* Route Title & Search */}
-      <div className="flex items-center gap-1.5 sm:gap-3 md:gap-6 flex-1 max-w-xl min-w-0">
-        {canGoBack && (
+      <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-1 max-w-xl min-w-0">
+        {/* Mobile Sidebar Hamburger Toggle or Back Button */}
+        {canGoBack ? (
           <button
             onClick={onBack}
             className="p-1.5 -ml-1 rounded-full hover:bg-[var(--surface-secondary)] text-[var(--text-primary)] transition-colors flex items-center justify-center shrink-0 active:scale-90"
@@ -46,29 +49,48 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <ArrowLeft className="w-5 h-5 text-[var(--text-primary)]" />
           </button>
+        ) : (
+          <button
+            onClick={onToggleSidebar}
+            className="p-2 -ml-1 rounded-xl hover:bg-[var(--surface-secondary)] text-[var(--text-primary)] md:hidden transition-colors flex items-center justify-center shrink-0"
+            title="Open Menu"
+            aria-label="Open Menu"
+          >
+            <Sliders className="w-5 h-5 text-[var(--accent)]" />
+          </button>
         )}
 
-        <h2 className="text-sm sm:text-base md:text-lg font-bold text-[var(--text-primary)] capitalize shrink-0 tracking-tight">
+        <h2 className="hidden sm:block text-sm sm:text-base md:text-lg font-bold text-[var(--text-primary)] capitalize shrink-0 tracking-tight">
           {title}
         </h2>
 
-        {/* Global Search Bar (Ctrl+K ready) */}
+        {/* Global Search Bar with Search Icon and Mic (matching reference) */}
         <div
           className="relative flex-1 cursor-pointer min-w-0"
           onClick={onOpenSearchModal}
         >
-          <Search className="w-3.5 h-3.5 md:w-4 md:h-4 absolute left-2.5 md:left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
           <input
             type="text"
             readOnly={Boolean(onOpenSearchModal)}
-            placeholder="Search music..."
+            placeholder="Search songs, playlists, and artists"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full pl-8 md:pl-9 pr-3 md:pr-12 py-1 md:py-1.5 rounded-[var(--radius)] bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer truncate"
+            className="w-full pl-9 pr-10 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-colors cursor-pointer truncate shadow-inner"
           />
-          <kbd className="hidden md:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
-            ⌘K
-          </kbd>
+          {onOpenIdentifyModal && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenIdentifyModal();
+              }}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--accent)] p-1 rounded-full transition-colors flex items-center gap-1"
+              title="Song Radar / Speech"
+            >
+              <span className="text-[var(--border)] text-xs">|</span>
+              <Mic className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
 

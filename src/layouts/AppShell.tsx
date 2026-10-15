@@ -38,6 +38,7 @@ import { OnlinePage } from '../pages/OnlinePage';
 import { DownloadsPage } from '../pages/DownloadsPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { GlobalSearchModal } from '../components/search/GlobalSearchModal';
+import { OpeningSplash } from '../components/common/OpeningSplash';
 
 import { backNavigationService } from '../services/navigation/BackNavigationService';
 
@@ -45,6 +46,7 @@ export const AppShell: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<NavRoute>('home');
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [isNetworkModalOpen, setIsNetworkModalOpen] = useState(false);
   const [isDebugModalOpen, setIsDebugModalOpen] = useState(false);
   const [isGlobalSearchOpen, setIsGlobalSearchOpen] = useState(false);
@@ -144,6 +146,13 @@ export const AppShell: React.FC = () => {
 
   // Register all modal & drawer back handlers in priority order
   useEffect(() => {
+    const unregisterMobileSidebar = isMobileSidebarOpen
+      ? backNavigationService.registerHandler(() => {
+          setIsMobileSidebarOpen(false);
+          return true;
+        })
+      : null;
+
     const unregisterIdentify = isIdentifyModalOpen
       ? backNavigationService.registerHandler(() => {
           setIsIdentifyModalOpen(false);
@@ -236,6 +245,7 @@ export const AppShell: React.FC = () => {
       : null;
 
     return () => {
+      unregisterMobileSidebar?.();
       unregisterIdentify?.();
       unregisterSearch?.();
       unregisterNetwork?.();
@@ -251,6 +261,7 @@ export const AppShell: React.FC = () => {
       unregisterPlaylistSelect?.();
     };
   }, [
+    isMobileSidebarOpen,
     isIdentifyModalOpen,
     isGlobalSearchOpen,
     isNetworkModalOpen,
@@ -312,14 +323,18 @@ export const AppShell: React.FC = () => {
         <Sidebar
           currentRoute={currentRoute}
           selectedPlaylistId={selectedPlaylistId}
+          isOpen={isMobileSidebarOpen}
+          onClose={() => setIsMobileSidebarOpen(false)}
           onNavigate={(r, pId) => {
             setCurrentRoute(r);
             setSelectedPlaylistId(pId || null);
+            setIsMobileSidebarOpen(false);
           }}
           onOpenNetworkModal={() => setIsNetworkModalOpen(true)}
           onCreatePlaylist={() => {
             setSelectedPlaylistId(null);
             setCurrentRoute('playlists');
+            setIsMobileSidebarOpen(false);
           }}
         />
 
@@ -329,6 +344,7 @@ export const AppShell: React.FC = () => {
             title={selectedPlaylistId ? 'Playlist' : currentRoute}
             canGoBack={currentRoute !== 'home' || Boolean(selectedPlaylistId)}
             onBack={handleGoBack}
+            onToggleSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
             onOpenNetworkModal={() => setIsNetworkModalOpen(true)}
             onOpenDebugModal={() => setIsDebugModalOpen(true)}
             searchQuery={searchQuery}
@@ -462,6 +478,9 @@ export const AppShell: React.FC = () => {
 
       {/* Central Notification Toasts */}
       <ToastContainer />
+
+      {/* Opening Launch Splash Animation */}
+      <OpeningSplash />
     </div>
   );
 };

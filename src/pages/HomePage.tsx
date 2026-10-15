@@ -1,70 +1,50 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Track,
   Album,
   Artist,
-  Genre,
   PlaylistRecord,
-  HomeDashboardSettings,
-  DEFAULT_HOME_SETTINGS,
-  ExplainableTrackRecommendation,
-  DailyMixCollection,
-  UnplayedAndForgottenBundle,
-  ListeningInsightsData,
-  ContinueListeningData,
-  SearchHistoryRecord,
+  MusicFolderRecord,
 } from '../types';
 import {
   TrackRepository,
   PlaylistRepository,
-  PlaylistTrackRepository,
-  SearchHistoryRepository,
+  FolderRepository,
 } from '../database/repository';
-import { SmartPlaylistEngine } from '../services/playlists/SmartPlaylistEngine';
 import { usePlayer } from '../player/PlayerContext';
-import { Button } from '../components/ui/Button';
-import {
-  FolderOpen,
-  PlusCircle,
-  Link2,
-  Play,
-  Music2,
-  Clock,
-  Heart,
-  Disc,
-  Headphones,
-  Sparkles,
-  Calendar,
-  User,
-  Star,
-  RotateCcw,
-  SlidersHorizontal,
-  BarChart3,
-  Search,
-  X,
-  History,
-  Users,
-  Tag,
-  Shuffle,
-  ChevronRight,
-  Pin,
-  Info,
-  CheckCircle2,
-  Compass,
-  Mic,
-} from 'lucide-react';
-import { musicDiscoveryService } from '../services/discovery/MusicDiscoveryService';
-import { SearchEngine } from '../services/search/SearchEngine';
-import { notificationService } from '../services/errorService';
-
-// Modals
-import { ArtistDetailsModal } from '../components/modals/ArtistDetailsModal';
-import { AlbumDetailsModal } from '../components/modals/AlbumDetailsModal';
-import { GenreDetailsModal } from '../components/modals/GenreDetailsModal';
+import { generateVibrantCover } from '../library/artworkCache';
+import { ContextMenu } from '../components/ui/ContextMenu';
+import { AddToPlaylistModal } from '../components/playlists/AddToPlaylistModal';
 import { TrackInfoModal } from '../components/modals/TrackInfoModal';
-import { HomeCustomizationModal } from '../components/modals/HomeCustomizationModal';
-import { ListeningStatsModal } from '../components/modals/ListeningStatsModal';
-import { MusicProfileModal } from '../components/modals/MusicProfileModal';
+import { AlbumDetailsModal } from '../components/modals/AlbumDetailsModal';
+import { ArtistDetailsModal } from '../components/modals/ArtistDetailsModal';
+import { notificationService } from '../services/errorService';
+import {
+  Play,
+  Pause,
+  Shuffle,
+  Star,
+  Clock,
+  Disc3,
+  Folder,
+  FolderPlus,
+  ArrowUpDown,
+  MoreVertical,
+  ChevronRight,
+  Heart,
+  Video,
+  Music2,
+  Users,
+  Search,
+  Sparkles,
+  Sliders,
+  ListMusic,
+  Plus,
+  Check,
+} from 'lucide-react';
+
+export type HomeTab = 'songs' | 'videos' | 'artists' | 'albums' | 'folders';
+export type QuickFilter = 'all' | 'favorites' | 'offline' | 'lossless' | 'recent';
 
 interface HomePageProps {
   onOpenFolder: () => void;
@@ -84,13 +64,6 @@ function formatDuration(seconds?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
-
 export const HomePage: React.FC<HomePageProps> = ({
   onOpenFolder,
   onAddMusic,
@@ -101,1226 +74,684 @@ export const HomePage: React.FC<HomePageProps> = ({
   onOpenIdentifyModal,
   searchQuery = '',
 }) => {
-  const { playTrack, playPlaylist, shufflePlaylist, toggleFavorite, currentTrack, state } =
-    usePlayer();
+  const {
+    playTrack,
+    playPlaylist,
+    shufflePlaylist,
+    togglePlayPause,
+    toggleFavorite,
+    addToQueue,
+    playNext,
+    currentTrack,
+    state: engineState,
+  } = usePlayer();
 
-  // Dashboard Settings & Section Order
-  const [dashboardSettings, setDashboardSettings] =
-    useState<HomeDashboardSettings>(DEFAULT_HOME_SETTINGS);
+  // Navigation & Filter States
+  const [activeTab, setActiveTab] = useState<HomeTab>('songs');
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
+  const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'dateAdded'>('title');
+  const [sortAsc, setSortAsc] = useState(true);
+  const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
   // Data States
   const [tracks, setTracks] = useState<Track[]>([]);
-  const [continueData, setContinueData] = useState<ContinueListeningData | null>(null);
-  const [recentlyAdded, setRecentlyAdded] = useState<Track[]>([]);
-  const [mostPlayed, setMostPlayed] = useState<Track[]>([]);
-  const [dailyMixes, setDailyMixes] = useState<DailyMixCollection[]>([]);
-  const [recommendations, setRecommendations] = useState<ExplainableTrackRecommendation[]>([]);
-  const [artists, setArtists] = useState<Artist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
-  const [genres, setGenres] = useState<Genre[]>([]);
-  const [unplayedData, setUnplayedData] = useState<UnplayedAndForgottenBundle | null>(null);
-  const [pinnedPlaylists, setPinnedPlaylists] = useState<PlaylistRecord[]>([]);
-  const [recentPlaylists, setRecentPlaylists] = useState<PlaylistRecord[]>([]);
-  const [insights, setInsights] = useState<ListeningInsightsData | null>(null);
-
-  // Search Suggestions State
-  const [localSearchInput, setLocalSearchInput] = useState(searchQuery);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [recentSearches, setRecentSearches] = useState<SearchHistoryRecord[]>([]);
-  const [searchSuggestions, setSearchSuggestions] = useState<Track[]>([]);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  // Active Modals State
-  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
-  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
-  const [selectedGenre, setSelectedGenre] = useState<Genre | null>(null);
-  const [selectedTrackForInfo, setSelectedTrackForInfo] = useState<Track | null>(null);
-  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false);
-  const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-
-  // Active Tab for Explore Section
-  const [exploreTab, setExploreTab] = useState<'artists' | 'albums' | 'genres'>('artists');
-  // Active Tab for Unplayed Section
-  const [unplayedTab, setUnplayedTab] = useState<'never' | 'forgotten' | 'rarely'>('never');
-
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
+  const [folders, setFolders] = useState<MusicFolderRecord[]>([]);
+  const [recentTracks, setRecentTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load Dashboard Settings
-  const loadSettings = async () => {
-    const s = await musicDiscoveryService.getDashboardSettings();
-    setDashboardSettings(s);
-  };
+  // Modals & Interactive States
+  const [selectedAlbum, setSelectedAlbum] = useState<Album | null>(null);
+  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
+  const [selectedTrackForInfo, setSelectedTrackForInfo] = useState<Track | null>(null);
+  const [playlistModalTracks, setPlaylistModalTracks] = useState<Track[] | null>(null);
+  const [contextMenuState, setContextMenuState] = useState<{
+    x: number;
+    y: number;
+    track: Track;
+  } | null>(null);
 
-  // Load Full Home Data
-  const loadHomeData = async () => {
+  // Load all library data
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const [
-        allTracks,
-        contData,
-        added,
-        played,
-        mixes,
-        recs,
-        allArtists,
-        allAlbums,
-        allGenres,
-        unplayed,
-        allPlaylists,
-        insightsData,
-        recentSearchTerms,
-      ] = await Promise.all([
+      const [allTracks, allAlbums, allArtists, allPlaylists, allFolders] = await Promise.all([
         TrackRepository.getAll(),
-        musicDiscoveryService.getContinueListeningData(),
-        musicDiscoveryService.getRecentlyAdded(12),
-        musicDiscoveryService.getMostPlayed(12),
-        musicDiscoveryService.getDailyMixes(),
-        musicDiscoveryService.getMadeForYouRecommendations(6),
-        TrackRepository.getArtists(),
         TrackRepository.getAlbums(),
-        TrackRepository.getGenres(),
-        musicDiscoveryService.getUnplayedAndForgotten(),
+        TrackRepository.getArtists(),
         PlaylistRepository.getAll(),
-        musicDiscoveryService.getListeningInsights('30days'),
-        SearchHistoryRepository.getRecent(5),
+        FolderRepository.getAll(),
       ]);
 
       setTracks(allTracks);
-      setContinueData(contData);
-      setRecentlyAdded(added);
-      setMostPlayed(played);
-      setDailyMixes(mixes);
-      setRecommendations(recs);
-      setArtists(allArtists.slice(0, 8));
-      setAlbums(allAlbums.slice(0, 8));
-      setGenres(allGenres.slice(0, 10));
-      setUnplayedData(unplayed);
-      setPinnedPlaylists(allPlaylists.filter((p) => p.isPinned));
-      setRecentPlaylists(allPlaylists.slice(0, 6));
-      setInsights(insightsData);
-      setRecentSearches(recentSearchTerms);
+      setAlbums(allAlbums);
+      setArtists(allArtists);
+      setPlaylists(allPlaylists);
+      setFolders(allFolders);
+
+      // Most recent tracks for the top recent card
+      const recent = [...allTracks]
+        .filter((t) => (t.lastPlayedAt || 0) > 0)
+        .sort((a, b) => (b.lastPlayedAt || 0) - (a.lastPlayedAt || 0));
+      setRecentTracks(recent.length > 0 ? recent : allTracks.slice(0, 20));
     } catch (err) {
-      console.error('Error loading home discovery data:', err);
+      console.warn('Failed to load home data:', err);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadSettings();
-    loadHomeData();
+    loadData();
 
-    const handleLibraryUpdate = () => loadHomeData();
-    const handleSettingsUpdate = () => loadSettings();
-    const handleRecsUpdate = async () => {
-      const updatedRecs = await musicDiscoveryService.getMadeForYouRecommendations(6);
-      setRecommendations(updatedRecs);
-    };
-
-    window.addEventListener('nova-library-updated', handleLibraryUpdate);
-    window.addEventListener('nova-playlists-updated', handleLibraryUpdate);
-    window.addEventListener('nova-home-settings-updated', handleSettingsUpdate);
-    window.addEventListener('nova-recommendations-updated', handleRecsUpdate);
-
-    return () => {
-      window.removeEventListener('nova-library-updated', handleLibraryUpdate);
-      window.removeEventListener('nova-playlists-updated', handleLibraryUpdate);
-      window.removeEventListener('nova-home-settings-updated', handleSettingsUpdate);
-      window.removeEventListener('nova-recommendations-updated', handleRecsUpdate);
-    };
+    const handleUpdated = () => loadData();
+    window.addEventListener('nova-playlists-updated', handleUpdated);
+    return () => window.removeEventListener('nova-playlists-updated', handleUpdated);
   }, []);
 
-  // Live Search Suggestions
-  useEffect(() => {
-    if (!localSearchInput.trim()) {
-      setSearchSuggestions([]);
-      return;
+  // Filtered and sorted songs
+  const processedTracks = useMemo(() => {
+    let result = [...tracks];
+
+    // Search query filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = result.filter(
+        (t) =>
+          t.title.toLowerCase().includes(q) ||
+          t.artist.toLowerCase().includes(q) ||
+          (t.album && t.album.toLowerCase().includes(q))
+      );
     }
 
-    const timer = setTimeout(async () => {
-      try {
-        const results = await SearchEngine.executeGlobalSearch(localSearchInput);
-        setSearchSuggestions(results.songs.slice(0, 5).map((r) => r.track));
-      } catch (err) {
-        console.error('Failed to run home search:', err);
+    // Quick filter chips
+    if (quickFilter === 'favorites') {
+      result = result.filter((t) => t.isFavorite);
+    } else if (quickFilter === 'offline') {
+      result = result.filter((t) => t.source === 'local');
+    } else if (quickFilter === 'lossless') {
+      result = result.filter((t) => ['flac', 'wav', 'alac'].includes(t.format?.toLowerCase() || ''));
+    } else if (quickFilter === 'recent') {
+      result = result.filter((t) => (t.lastPlayedAt || 0) > 0);
+      result.sort((a, b) => (b.lastPlayedAt || 0) - (a.lastPlayedAt || 0));
+      return result;
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === 'title') {
+        cmp = a.title.localeCompare(b.title);
+      } else if (sortField === 'artist') {
+        cmp = a.artist.localeCompare(b.artist);
+      } else if (sortField === 'album') {
+        cmp = (a.album || '').localeCompare(b.album || '');
+      } else if (sortField === 'dateAdded') {
+        cmp = (a.dateAdded || 0) - (b.dateAdded || 0);
       }
-    }, 150);
+      return sortAsc ? cmp : -cmp;
+    });
 
-    return () => clearTimeout(timer);
-  }, [localSearchInput]);
+    return result;
+  }, [tracks, searchQuery, quickFilter, sortField, sortAsc]);
 
-  // Handle Outside Click for Search Dropdown
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(e.target as Node)
-      ) {
-        setIsSearchFocused(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // Favorites count
+  const favoritesCount = useMemo(() => tracks.filter((t) => t.isFavorite).length, [tracks]);
 
-  // Safe Track Playback with Availability Check
-  const handleSafePlayTrack = (track: Track, queueList?: Track[]) => {
-    const check = musicDiscoveryService.verifyTrackPlayback(track);
-    if (!check.canPlay) {
-      notificationService.error('Cannot Play Track', check.reason || 'File is unavailable.');
-      return;
-    }
-    playTrack(track, queueList || [track]);
-  };
-
-  // Safe Playlist Playback
-  const handleSafePlayPlaylist = async (playlist: PlaylistRecord) => {
-    let tracksToPlay: Track[] = [];
-    if (playlist.type === 'smart' && playlist.smartDefinition) {
-      const all = await TrackRepository.getAll();
-      tracksToPlay = SmartPlaylistEngine.filterTracks(all, playlist.smartDefinition);
-    } else {
-      const pTracks = await PlaylistTrackRepository.getTracksForPlaylist(playlist.id);
-      tracksToPlay = pTracks.map((pt) => pt.trackData).filter(Boolean) as Track[];
-    }
-    if (tracksToPlay.length > 0) {
-      playPlaylist(tracksToPlay, 0);
-    } else {
-      notificationService.info('Empty Playlist', `"${playlist.name}" has no tracks.`);
+  // Handle playing all tracks with shuffle
+  const handleShuffleAll = () => {
+    if (processedTracks.length > 0) {
+      shufflePlaylist(processedTracks);
+      notificationService.success('Shuffle Playback', `Playing ${processedTracks.length} tracks.`);
     }
   };
 
-  // Dismiss a Recommendation
-  const handleDismissRecommendation = (trackId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    musicDiscoveryService.dismissRecommendation(trackId);
-    setRecommendations((prev) => prev.filter((r) => r.track.id !== trackId));
-    notificationService.info('Recommendation Dismissed', 'This song will no longer be suggested.');
-  };
+  const isAudioPlaying = engineState.status === 'playing';
 
-  // Toggle Pin Playlist
-  const handleTogglePinPlaylist = async (playlistId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const isPinned = await PlaylistRepository.togglePinned(playlistId);
-    const updated = await PlaylistRepository.getAll();
-    setPinnedPlaylists(updated.filter((p) => p.isPinned));
-    notificationService.info(
-      isPinned ? 'Playlist Pinned' : 'Playlist Unpinned',
-      isPinned ? 'Added to quick collections.' : 'Removed from quick collections.'
-    );
-  };
-
-  // Items display count & density classes
-  const isCompact = dashboardSettings.cardDensity === 'compact';
-  const itemsLimit = dashboardSettings.itemsPerSection || 6;
-
-  // ─────────────────────────────────────────────────────────────
-  // RENDER SECTIONS
-  // ─────────────────────────────────────────────────────────────
-
-  // Section 1: Greeting & Quick Access
-  const renderGreetingQuickAccess = () => (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[var(--surface-secondary)] via-[var(--surface-card)] to-[var(--surface-secondary)] border border-[var(--border)] p-6 md:p-8 shadow-sm">
-      <div className="relative z-10 max-w-3xl space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface)] text-[var(--accent)] text-xs font-semibold border border-[var(--border)]">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Local Music Station • Air-Gapped &amp; Private</span>
+  return (
+    <div className="flex-1 overflow-y-auto px-3 sm:px-5 md:px-8 py-3 sm:py-5 space-y-4 sm:space-y-6 max-w-5xl mx-auto select-none">
+      {/* 1. TOP 3 VIBRANT QUICK ACTION CARDS (Matching Reference Screenshots) */}
+      <div className="grid grid-cols-3 gap-2.5 sm:gap-4">
+        {/* Card 1: Favorites (Vibrant Royal Purple Gradient) */}
+        <button
+          onClick={() => {
+            setActiveTab('songs');
+            setQuickFilter('favorites');
+          }}
+          className="relative overflow-hidden rounded-2xl p-3 sm:p-4 text-left transition-all duration-200 shadow-lg active:scale-95 group"
+          style={{
+            background: 'linear-gradient(135deg, #6366f1 0%, #7c3aed 100%)',
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <Star className="w-4 h-4 sm:w-5 sm:h-5 text-white fill-current" />
           </div>
-          <span className="text-xs text-[var(--text-muted)]">•</span>
-          <span className="text-xs text-[var(--text-secondary)]">
-            {tracks.length} tracks in collection
-          </span>
-        </div>
+          <div className="text-xs sm:text-base font-extrabold text-white tracking-tight truncate">
+            Favorites
+          </div>
+          <div className="text-[10px] sm:text-xs text-white/80 font-medium">
+            {favoritesCount} songs
+          </div>
+        </button>
 
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
-            {getGreeting()}, Explorer
-          </h1>
-          <p className="text-xs md:text-sm text-[var(--text-secondary)] mt-1 max-w-xl leading-relaxed">
-            Personalized offline music hub. Rediscover songs you own, explore your artists and genres,
-            and enjoy high-resolution sound without telemetry.
-          </p>
-        </div>
+        {/* Card 2: Playlists (Vibrant Emerald / Teal Gradient) */}
+        <button
+          onClick={() => {
+            if (onNavigate) {
+              onNavigate('playlists');
+            }
+          }}
+          className="relative overflow-hidden rounded-2xl p-3 sm:p-4 text-left transition-all duration-200 shadow-lg active:scale-95 group"
+          style={{
+            background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)',
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <Disc3 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          </div>
+          <div className="text-xs sm:text-base font-extrabold text-white tracking-tight truncate">
+            Playlists
+          </div>
+          <div className="text-[10px] sm:text-xs text-white/80 font-medium">
+            {playlists.length} lists
+          </div>
+        </button>
 
-        {/* Quick Access Pills */}
-        <div className="flex flex-wrap items-center gap-2 pt-2">
-          {onOpenSearchModal && (
-            <button
-              onClick={onOpenSearchModal}
-              className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
-            >
-              <Search className="w-3.5 h-3.5 text-[var(--accent)]" /> Search
-            </button>
-          )}
-          {onOpenIdentifyModal && (
-            <button
-              onClick={onOpenIdentifyModal}
-              className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-xs font-semibold text-cyan-400 hover:bg-cyan-500/20 flex items-center gap-2 transition-all shadow-sm"
-              title="Identify Ambient Music (Shazam)"
-            >
-              <Mic className="w-3.5 h-3.5 text-cyan-400" /> Identify
-            </button>
-          )}
-          {onNavigate && (
-            <>
-              <button
-                onClick={() => onNavigate('library')}
-                className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
-              >
-                <Music2 className="w-3.5 h-3.5 text-[var(--accent)]" /> Library
-              </button>
-              <button
-                onClick={() => onNavigate('favorites')}
-                className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
-              >
-                <Heart className="w-3.5 h-3.5 text-rose-400" /> Favorites
-              </button>
-              <button
-                onClick={() => onNavigate('playlists')}
-                className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
-              >
-                <Pin className="w-3.5 h-3.5 text-amber-400" /> Playlists
-              </button>
-              <button
-                onClick={() => onNavigate('downloads')}
-                className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
-              >
-                <Disc className="w-3.5 h-3.5 text-emerald-400" /> Downloads
-              </button>
-            </>
-          )}
-          <button
-            onClick={() => setIsStatsModalOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-cyan-400" /> Stats &amp; Insights
-          </button>
-          <button
-            onClick={() => setIsCustomizationOpen(true)}
-            className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] hover:border-[var(--accent)] flex items-center gap-2 transition-all shadow-sm ml-auto"
-            title="Customize Home Dashboard"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-[var(--text-muted)]" /> Customize
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Search Input Bar with Suggestions
-  const renderSearchBar = () => (
-    <div ref={searchContainerRef} className="relative w-full max-w-2xl">
-      <div className="relative flex items-center">
-        <Search className="w-4 h-4 text-[var(--text-muted)] absolute left-3.5 pointer-events-none" />
-        <input
-          type="text"
-          value={localSearchInput}
-          onChange={(e) => setLocalSearchInput(e.target.value)}
-          onFocus={() => setIsSearchFocused(true)}
-          placeholder="Search your library (songs, artists, albums, genres)..."
-          className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--accent)] transition-all shadow-sm"
-        />
-        {localSearchInput && (
-          <button
-            onClick={() => setLocalSearchInput('')}
-            className="absolute right-3 text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
+        {/* Card 3: Recent (Vibrant Orange / Amber Gradient) */}
+        <button
+          onClick={() => {
+            if (onNavigate) {
+              onNavigate('history');
+            } else {
+              setActiveTab('songs');
+              setQuickFilter('recent');
+            }
+          }}
+          className="relative overflow-hidden rounded-2xl p-3 sm:p-4 text-left transition-all duration-200 shadow-lg active:scale-95 group"
+          style={{
+            background: 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
+          }}
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+          </div>
+          <div className="text-xs sm:text-base font-extrabold text-white tracking-tight truncate">
+            Recent
+          </div>
+          <div className="text-[10px] sm:text-xs text-white/80 font-medium">
+            {recentTracks.length} played
+          </div>
+        </button>
       </div>
 
-      {/* Suggestions & Recent Searches Dropdown */}
-      {isSearchFocused && (
-        <div className="absolute top-full mt-2 left-0 right-0 z-40 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] shadow-2xl overflow-hidden divide-y divide-[var(--border-subtle)]">
-          {/* Quick Track Suggestions */}
-          {searchSuggestions.length > 0 && (
-            <div className="p-2 space-y-1">
-              <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                Matching Songs
-              </div>
-              {searchSuggestions.map((track) => (
-                <div
-                  key={track.id}
-                  onClick={() => {
-                    handleSafePlayTrack(track);
-                    setIsSearchFocused(false);
-                    SearchHistoryRepository.addSearch(track.title);
-                  }}
-                  className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-[var(--surface-secondary)] cursor-pointer transition-colors group"
-                >
-                  <div className="w-8 h-8 rounded bg-[var(--surface)] shrink-0 overflow-hidden flex items-center justify-center border border-[var(--border)]">
-                    {track.coverArtUrl ? (
-                      <img src={track.coverArtUrl} alt="Cover" className="w-full h-full object-cover" />
-                    ) : (
-                      <Music2 className="w-4 h-4 text-[var(--text-muted)]" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-semibold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
-                      {track.title}
-                    </div>
-                    <div className="text-[11px] text-[var(--text-secondary)] truncate">
-                      {track.artist}
-                    </div>
-                  </div>
-                  <Play className="w-4 h-4 text-[var(--accent)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-              ))}
+      {/* 2. RECENT / CURRENTLY PLAYED ANIMATED CARD (Requirement 7) */}
+      {currentTrack && (
+        <div
+          onClick={onOpenFullPlayer}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-950/60 via-slate-900/80 to-purple-950/40 border border-purple-500/30 p-3 sm:p-4 cursor-pointer shadow-xl transition-all duration-300 hover:border-purple-400 group"
+        >
+          <div className="flex items-center justify-between gap-3">
+            {/* Spinning 3D Vinyl / Movie Artwork */}
+            <div className="relative w-12 h-12 sm:w-14 sm:h-14 rounded-full overflow-hidden shrink-0 shadow-md border-2 border-purple-500/40">
+              <img
+                src={currentTrack.coverArtUrl || generateVibrantCover(currentTrack.title, currentTrack.artist)}
+                alt={currentTrack.title}
+                className={`w-full h-full object-cover ${isAudioPlaying ? 'animate-spin-slow' : ''}`}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = generateVibrantCover(currentTrack.title, currentTrack.artist);
+                }}
+              />
+              <div className="absolute inset-0 m-auto w-3.5 h-3.5 rounded-full bg-black/80 border border-purple-400" />
             </div>
-          )}
 
-          {/* Recent Searches */}
-          {recentSearches.length > 0 && (
-            <div className="p-2 space-y-1 bg-[var(--surface-secondary)]/30">
-              <div className="flex items-center justify-between px-3 py-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
-                  <History className="w-3 h-3 text-[var(--accent)]" /> Recent Searches
+            {/* Track Info & Animated Equalizer Waves */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">
+                  {isAudioPlaying ? 'NOW PLAYING' : 'RECENTLY PLAYED'}
                 </span>
+                {/* Bouncing audio equalizer bars when active */}
+                {isAudioPlaying && (
+                  <div className="flex items-end gap-0.5 h-3.5">
+                    <span className="w-0.5 h-2.5 bg-purple-400 rounded-full animate-pulse" />
+                    <span className="w-0.5 h-3.5 bg-pink-400 rounded-full animate-pulse delay-75" />
+                    <span className="w-0.5 h-2 bg-cyan-400 rounded-full animate-pulse delay-150" />
+                  </div>
+                )}
+              </div>
+              <h4 className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                {currentTrack.title}
+              </h4>
+              <p className="text-[11px] text-[var(--text-secondary)] truncate">
+                {currentTrack.artist} {currentTrack.album ? `• ${currentTrack.album}` : ''}
+              </p>
+            </div>
+
+            {/* Quick Play/Pause Action Button */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  togglePlayPause();
+                }}
+                className="w-10 h-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white flex items-center justify-center shadow-lg transition-transform active:scale-90"
+              >
+                {isAudioPlaying ? (
+                  <Pause className="w-5 h-5 fill-current" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current ml-0.5" />
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. HORIZONTAL CATEGORY NAVIGATION TABS (Matching Reference Screenshots) */}
+      <div className="flex items-center border-b border-[var(--border)] overflow-x-auto no-scrollbar pt-1">
+        {(
+          [
+            { id: 'songs', label: 'Songs' },
+            { id: 'videos', label: 'Videos' },
+            { id: 'artists', label: 'Artists' },
+            { id: 'albums', label: 'Albums' },
+            { id: 'folders', label: 'Folders' },
+          ] as { id: HomeTab; label: string }[]
+        ).map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className="relative px-3 sm:px-5 py-2.5 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap"
+            >
+              <span
+                className={`${
+                  isActive
+                    ? 'text-white font-extrabold'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                {tab.label}
+              </span>
+              {/* Vibrant Active Tab Underline Pill (Matching Reference) */}
+              {isActive && (
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 4. SUB-ACTION BAR: SHUFFLE PLAYBACK & SORT CONTROLS */}
+      <div className="flex items-center justify-between gap-3 pt-1">
+        {/* Shuffle playback button (Vibrant purple circle + text) */}
+        <button
+          onClick={handleShuffleAll}
+          className="flex items-center gap-2.5 px-3 py-1.5 rounded-full hover:bg-[var(--surface-secondary)] text-[var(--text-primary)] font-bold text-xs sm:text-sm transition-colors active:scale-95 group"
+        >
+          <div className="w-7 h-7 rounded-full bg-purple-600 text-white flex items-center justify-center shadow-md group-hover:bg-purple-500">
+            <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+          </div>
+          <span>Shuffle playback</span>
+        </button>
+
+        {/* Sort and Options */}
+        <div className="relative flex items-center gap-1.5">
+          <button
+            onClick={() => setSortAsc(!sortAsc)}
+            className="p-2 rounded-xl text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
+            title="Toggle Sort Order"
+          >
+            <ArrowUpDown className="w-4 h-4" />
+          </button>
+
+          {activeTab === 'folders' && (
+            <button
+              onClick={onOpenFolder}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md"
+            >
+              <FolderPlus className="w-4 h-4" />
+              <span>+ Add Folder</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 5. VIBRANT CUSTOMIZE FILTER CHIPS (Requirement 8) */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        {(
+          [
+            { id: 'all', label: 'All' },
+            { id: 'favorites', label: 'Favorites ★' },
+            { id: 'offline', label: 'Offline ⚡' },
+            { id: 'lossless', label: 'Lossless 🎧' },
+            { id: 'recent', label: 'Recent 🕒' },
+          ] as { id: QuickFilter; label: string }[]
+        ).map((f) => {
+          const isSelected = quickFilter === f.id;
+          return (
+            <button
+              key={f.id}
+              onClick={() => setQuickFilter(f.id)}
+              className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-150 ${
+                isSelected
+                  ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md font-bold border border-purple-400/40'
+                  : 'bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-white border border-[var(--border)]'
+              }`}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 6. TAB CONTENT VIEWS (Matching Reference Screenshots 1, 2, 3) */}
+
+      {/* TAB A: SONGS LIST (Matching Reference Screenshot 2) */}
+      {activeTab === 'songs' && (
+        <div className="space-y-1.5">
+          {processedTracks.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-4">
+              <Music2 className="w-12 h-12 text-purple-400 mx-auto opacity-50" />
+              <div className="space-y-1">
+                <h3 className="text-sm font-bold text-white">No Songs Found</h3>
+                <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
+                  Scan a music folder from your phone to load all your songs automatically.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-3 pt-2">
                 <button
-                  type="button"
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    await SearchHistoryRepository.clear();
-                    setRecentSearches([]);
-                  }}
-                  className="text-[10px] text-[var(--text-muted)] hover:text-rose-400 transition-colors"
+                  onClick={onOpenFolder}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-2"
                 >
-                  Clear
+                  <FolderPlus className="w-4 h-4" /> Select Music Folder
+                </button>
+                <button
+                  onClick={onAddMusic}
+                  className="px-4 py-2 rounded-xl bg-[var(--surface-secondary)] hover:bg-[var(--surface-hover)] text-white text-xs font-bold border border-[var(--border)] transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> Pick Audio Files
                 </button>
               </div>
-              {recentSearches.map((rec) => (
-                <div
-                  key={rec.id}
-                  onClick={() => {
-                    setLocalSearchInput(rec.query);
-                  }}
-                  className="flex items-center justify-between px-3 py-1.5 rounded-md hover:bg-[var(--surface)] cursor-pointer text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  <span className="truncate">{rec.query}</span>
-                  <button
-                    onClick={async (e) => {
-                      e.stopPropagation();
-                      if (rec.id !== undefined) {
-                        await SearchHistoryRepository.remove(rec.id);
-                        setRecentSearches((prev) => prev.filter((r) => r.id !== rec.id));
-                      }
-                    }}
-                    className="text-[var(--text-muted)] hover:text-rose-400 p-0.5"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              ))}
             </div>
+          ) : (
+            processedTracks.map((track) => {
+              const coverUrl =
+                track.coverArtUrl || generateVibrantCover(track.title, track.artist);
+
+              return (
+                <div
+                  key={track.id}
+                  onClick={() => playTrack(track, processedTracks)}
+                  className="flex items-center justify-between p-2.5 rounded-xl hover:bg-[var(--surface-secondary)] cursor-pointer group transition-colors border border-transparent hover:border-[var(--border-subtle)]"
+                >
+                  {/* Left: 48x48 Rounded Movie Poster / Artwork */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-[var(--surface-card)] border border-[var(--border-subtle)] relative shadow-sm">
+                      <img
+                        src={coverUrl}
+                        alt={track.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = generateVibrantCover(track.title, track.artist);
+                        }}
+                      />
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-xs sm:text-sm text-white truncate group-hover:text-purple-300 transition-colors">
+                        {track.title}
+                      </div>
+                      <div className="text-[11px] sm:text-xs text-[var(--text-muted)] truncate flex items-center gap-1.5 mt-0.5">
+                        <span className="truncate">
+                          {track.artist} {track.album ? `| ${track.album}` : ''}{' '}
+                          {track.year ? `- (${track.year})` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Favorite Toggle & Context Menu (3 Dots) */}
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleFavorite(track.id);
+                      }}
+                      className="p-1.5 rounded-full text-[var(--text-muted)] hover:text-rose-400 transition-colors"
+                      title="Toggle Favorite"
+                    >
+                      <Heart
+                        className={`w-4 h-4 ${
+                          track.isFavorite ? 'text-rose-500 fill-current' : ''
+                        }`}
+                      />
+                    </button>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setContextMenuState({ x: e.clientX, y: e.clientY, track });
+                      }}
+                      className="p-1.5 rounded-full text-[var(--text-muted)] hover:text-white transition-colors"
+                      title="Song Options"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
       )}
-    </div>
-  );
 
-  // Section 2: Continue Listening
-  const renderContinueListening = () => {
-    if (!continueData || (!continueData.lastTrack && continueData.recentTracks.length === 0)) {
-      return null;
-    }
+      {/* TAB B: ALBUMS (Matching Reference Screenshot 1) */}
+      {activeTab === 'albums' && (
+        <div className="space-y-2">
+          {albums.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] text-xs text-[var(--text-muted)]">
+              No albums discovered yet. Scan a folder containing music tracks.
+            </div>
+          ) : (
+            albums.map((album) => {
+              const coverUrl =
+                album.coverArtUrl || generateVibrantCover(album.title, album.artist);
 
-    const { lastTrack, lastPosition, recentTracks, recentAlbums } = continueData;
+              return (
+                <div
+                  key={album.id}
+                  onClick={() => setSelectedAlbum(album)}
+                  className="flex items-center justify-between p-3 rounded-2xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border-subtle)] hover:border-purple-500/40 cursor-pointer transition-all shadow-sm group"
+                >
+                  <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                    {/* 52x52 Rounded Movie Poster */}
+                    <div className="w-14 h-14 rounded-xl overflow-hidden shrink-0 bg-[var(--surface-secondary)] border border-[var(--border-subtle)] shadow-md">
+                      <img
+                        src={coverUrl}
+                        alt={album.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = generateVibrantCover(album.title, album.artist);
+                        }}
+                      />
+                    </div>
 
-    return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Clock className="w-4 h-4 text-[var(--accent)]" /> Continue Listening
-          </h2>
-          {recentTracks.length > 0 && (
-            <button
-              onClick={() => handleSafePlayTrack(recentTracks[0], recentTracks)}
-              className="text-xs font-semibold text-[var(--accent)] hover:underline flex items-center gap-1"
-            >
-              Play All Recent <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                        {album.title}
+                      </h4>
+                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
+                        {album.artist}
+                      </p>
+                      <p className="text-[10px] text-[var(--text-secondary)] font-mono mt-0.5">
+                        {album.trackCount} track{album.trackCount !== 1 ? 's' : ''} •{' '}
+                        {formatDuration(album.duration)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <ChevronRight className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-3" />
+                </div>
+              );
+            })
           )}
         </div>
+      )}
 
-        {/* Hero Resume Card */}
-        {lastTrack && (
-          <div className="p-4 rounded-2xl bg-gradient-to-r from-[var(--surface-secondary)] to-[var(--surface)] border border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
-            <div className="flex items-center gap-4 min-w-0">
-              <div className="w-16 h-16 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] overflow-hidden shrink-0 flex items-center justify-center shadow-md">
-                {lastTrack.coverArtUrl ? (
-                  <img src={lastTrack.coverArtUrl} alt="Cover" className="w-full h-full object-cover" />
-                ) : (
-                  <Disc className="w-8 h-8 text-[var(--text-muted)]" />
-                )}
-              </div>
-              <div className="min-w-0 space-y-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-                  Last Played Track
-                </span>
-                <h3 className="text-sm font-bold text-[var(--text-primary)] truncate">
-                  {lastTrack.title}
-                </h3>
-                <p className="text-xs text-[var(--text-secondary)] truncate">
-                  {lastTrack.artist} • {lastTrack.album || 'Single'}
-                </p>
-                {lastPosition && lastPosition > 0 ? (
-                  <span className="inline-block text-[11px] font-mono text-[var(--text-muted)]">
-                    Position: {formatDuration(lastPosition)} / {formatDuration(lastTrack.duration)}
-                  </span>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <Button
-                variant="primary"
-                size="md"
-                icon={<Play className="w-4 h-4 fill-current ml-0.5" />}
-                onClick={() => handleSafePlayTrack(lastTrack, recentTracks)}
-              >
-                Resume Song
-              </Button>
+      {/* TAB C: FOLDERS (Matching Reference Screenshot 3) */}
+      {activeTab === 'folders' && (
+        <div className="space-y-2">
+          {folders.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-3">
+              <Folder className="w-12 h-12 text-purple-400 mx-auto opacity-50" />
+              <div className="text-sm font-semibold text-white">No Music Folders Added</div>
+              <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
+                Add your phone's Music or Audio directory to manage all your songs by folder.
+              </p>
               <button
-                type="button"
-                onClick={() => setSelectedTrackForInfo(lastTrack)}
-                className="p-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-card)] text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--accent)] transition-all"
-                title="Song Details"
+                onClick={onOpenFolder}
+                className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md inline-flex items-center gap-2"
               >
-                <Info className="w-4 h-4" />
+                <FolderPlus className="w-4 h-4" /> Add Music Folder
               </button>
             </div>
-          </div>
-        )}
+          ) : (
+            folders.map((folder) => (
+              <div
+                key={folder.path}
+                onClick={() => {
+                  setActiveTab('songs');
+                }}
+                className="flex items-center justify-between p-3.5 rounded-2xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border-subtle)] hover:border-purple-500/40 cursor-pointer transition-all shadow-sm group"
+              >
+                <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                  {/* Purple Folder Icon */}
+                  <div className="w-12 h-12 rounded-xl bg-purple-600/20 text-purple-400 border border-purple-500/30 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                    <Folder className="w-6 h-6 fill-current" />
+                  </div>
 
-        {/* Recently Played Tracks Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {recentTracks.slice(0, itemsLimit).map((track) => (
-            <div
-              key={track.id}
-              onClick={() => handleSafePlayTrack(track, recentTracks)}
-              className="group p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all space-y-2 shadow-sm"
-            >
-              <div className="aspect-square rounded-lg bg-[var(--surface-secondary)] relative overflow-hidden flex items-center justify-center border border-[var(--border-subtle)]">
-                {track.coverArtUrl ? (
-                  <img src={track.coverArtUrl} alt={track.title} className="w-full h-full object-cover" />
-                ) : (
-                  <Disc className="w-8 h-8 text-[var(--text-muted)] group-hover:text-[var(--accent)] transition-colors" />
-                )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full btn-primary flex items-center justify-center shadow-lg">
-                    <Play className="w-4 h-4 fill-current ml-0.5 text-[var(--btn-text)]" />
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                      {folder.path.split('/').filter(Boolean).pop() || 'Music'}
+                    </h4>
+                    <p className="text-xs text-[var(--text-muted)] truncate mt-0.5 font-mono">
+                      {folder.trackCount} songs | {folder.path}
+                    </p>
                   </div>
                 </div>
+
+                <ChevronRight className="w-5 h-5 text-[var(--text-muted)] group-hover:text-white transition-colors shrink-0 ml-3" />
               </div>
-              <div className="space-y-0.5">
-                <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{track.title}</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] truncate">{track.artist}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 3: Daily Mixes & Dynamic Collections
-  const renderDailyMixes = () => {
-    if (dailyMixes.length === 0) return null;
-
-    return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[var(--accent)]" /> Daily Mixes &amp; Collections
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              Dynamic collections automatically generated from your library
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {dailyMixes.map((mix) => (
-            <div
-              key={mix.id}
-              className={`group relative p-5 rounded-2xl bg-gradient-to-br ${mix.gradient} text-white shadow-lg overflow-hidden flex flex-col justify-between transition-all transform hover:-translate-y-0.5`}
-            >
-              <div className="space-y-1 z-10">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-white/80">
-                  {mix.subtitle}
-                </span>
-                <h3 className="text-lg font-black tracking-tight">{mix.name}</h3>
-                <p className="text-xs text-white/85 line-clamp-2 leading-relaxed">
-                  {mix.description}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-6 z-10">
-                <span className="text-[11px] font-mono text-white/75">
-                  {formatDuration(mix.totalDuration)}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (mix.tracks.length > 0) {
-                        const shuffled = [...mix.tracks].sort(() => 0.5 - Math.random());
-                        handleSafePlayTrack(shuffled[0], shuffled);
-                      }
-                    }}
-                    className="p-2 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-md text-white transition-all"
-                    title="Shuffle Mix"
-                  >
-                    <Shuffle className="w-4 h-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (mix.tracks.length > 0) {
-                        handleSafePlayTrack(mix.tracks[0], mix.tracks);
-                      }
-                    }}
-                    className="w-9 h-9 rounded-full bg-white text-black flex items-center justify-center hover:scale-105 transition-all shadow-md"
-                    title="Play Mix"
-                  >
-                    <Play className="w-4 h-4 fill-current ml-0.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 4: Made for You (Personalized Recommendations)
-  const renderMadeForYou = () => {
-    if (!dashboardSettings.recommendationsEnabled || recommendations.length === 0) {
-      return null;
-    }
-
-    return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" /> Made for You
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              Explainable local recommendations based on your listening history
-            </p>
-          </div>
-          <button
-            onClick={() => setIsCustomizationOpen(true)}
-            className="text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
-            Manage Signals
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {recommendations.slice(0, itemsLimit).map((rec) => (
-            <div
-              key={rec.track.id}
-              onClick={() => handleSafePlayTrack(rec.track)}
-              className="group relative p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all space-y-2.5 shadow-sm"
-            >
-              {/* Dismiss Button */}
-              <button
-                type="button"
-                onClick={(e) => handleDismissRecommendation(rec.track.id, e)}
-                className="absolute top-2 right-2 z-20 p-1 rounded-full bg-black/60 text-white/70 hover:text-white hover:bg-black/90 opacity-0 group-hover:opacity-100 transition-opacity"
-                title="Dismiss Recommendation"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-[var(--surface-secondary)] shrink-0 overflow-hidden flex items-center justify-center border border-[var(--border)]">
-                  {rec.track.coverArtUrl ? (
-                    <img src={rec.track.coverArtUrl} alt="Cover" className="w-full h-full object-cover" />
-                  ) : (
-                    <Music2 className="w-6 h-6 text-[var(--text-muted)]" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <h4 className="text-xs font-bold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
-                    {rec.track.title}
-                  </h4>
-                  <p className="text-[11px] text-[var(--text-secondary)] truncate">
-                    {rec.track.artist}
-                  </p>
-                </div>
-              </div>
-
-              {/* Explainability Tag */}
-              <div className="px-2.5 py-1 rounded-lg bg-[var(--surface-secondary)] text-[10px] text-[var(--text-muted)] flex items-center gap-1.5 truncate border border-[var(--border-subtle)]">
-                <Info className="w-3 h-3 text-[var(--accent)] shrink-0" />
-                <span className="truncate">{rec.reason}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 5: Recently Added Music
-  const renderRecentlyAdded = () => {
-    if (recentlyAdded.length === 0) return null;
-
-    return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-[var(--accent)]" /> Recently Added Music
-          </h2>
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate('library')}
-              className="text-xs font-semibold text-[var(--accent)] hover:underline flex items-center gap-1"
-            >
-              See All <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            ))
           )}
         </div>
+      )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {recentlyAdded.slice(0, itemsLimit).map((track) => (
-            <div
-              key={track.id}
-              onClick={() => handleSafePlayTrack(track, recentlyAdded)}
-              className="group p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all space-y-2 shadow-sm"
-            >
-              <div className="aspect-square rounded-lg bg-[var(--surface-secondary)] relative overflow-hidden flex items-center justify-center border border-[var(--border-subtle)]">
-                {track.coverArtUrl ? (
-                  <img src={track.coverArtUrl} alt={track.title} className="w-full h-full object-cover" />
-                ) : (
-                  <Disc className="w-8 h-8 text-[var(--text-muted)] group-hover:text-[var(--accent)] transition-colors" />
-                )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full btn-primary flex items-center justify-center shadow-lg">
-                    <Play className="w-4 h-4 fill-current ml-0.5 text-[var(--btn-text)]" />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-0.5">
-                <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{track.title}</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] truncate">{track.artist}</p>
-              </div>
+      {/* TAB D: ARTISTS */}
+      {activeTab === 'artists' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {artists.length === 0 ? (
+            <div className="col-span-full p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] text-xs text-[var(--text-muted)]">
+              No artists discovered yet.
             </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 6: Most-Played Music
-  const renderMostPlayed = () => {
-    if (mostPlayed.length === 0) return null;
-
-    return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Headphones className="w-4 h-4 text-[var(--accent)]" /> Most-Played Music
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              Ranked by your verified playback counts
-            </p>
-          </div>
-          <button
-            onClick={() => handleSafePlayTrack(mostPlayed[0], mostPlayed)}
-            className="text-xs font-semibold text-[var(--accent)] hover:underline flex items-center gap-1"
-          >
-            Play All <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-          {mostPlayed.slice(0, itemsLimit).map((track, idx) => (
-            <div
-              key={track.id}
-              onClick={() => handleSafePlayTrack(track, mostPlayed)}
-              className="flex items-center gap-3 p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all group shadow-sm"
-            >
-              <span className="w-5 text-center text-xs font-black font-mono text-[var(--accent)] shrink-0">
-                #{idx + 1}
-              </span>
-              <div className="w-11 h-11 rounded-lg bg-[var(--surface-secondary)] shrink-0 overflow-hidden flex items-center justify-center border border-[var(--border)]">
-                {track.coverArtUrl ? (
-                  <img src={track.coverArtUrl} alt="Cover" className="w-full h-full object-cover" />
-                ) : (
-                  <Music2 className="w-5 h-5 text-[var(--text-muted)]" />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-xs font-bold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
-                  {track.title}
-                </h4>
-                <p className="text-[11px] text-[var(--text-secondary)] truncate">
-                  {track.artist}
-                </p>
-              </div>
-              <span className="text-[10px] font-mono text-[var(--text-muted)] shrink-0 px-2 py-0.5 rounded bg-[var(--surface-secondary)]">
-                {track.playCount || 1} plays
-              </span>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 7: Explore Your Library (Artists, Albums, Genres)
-  const renderExploreLibrary = () => {
-    return (
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Compass className="w-4 h-4 text-[var(--accent)]" /> Explore Your Library
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              Browse your personal music collection
-            </p>
-          </div>
-
-          <div className="flex rounded-lg overflow-hidden border border-[var(--border)] p-1 bg-[var(--surface)]">
-            {(['artists', 'albums', 'genres'] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setExploreTab(tab)}
-                className={`px-3 py-1 text-xs font-medium rounded-md capitalize transition-all ${
-                  exploreTab === tab
-                    ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-sm'
-                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {exploreTab === 'artists' && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-            {artists.map((artist) => (
+          ) : (
+            artists.map((artist) => (
               <div
                 key={artist.id}
                 onClick={() => setSelectedArtist(artist)}
-                className="group p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all text-center space-y-2 shadow-sm"
+                className="p-4 rounded-2xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border-subtle)] hover:border-purple-500/40 cursor-pointer transition-all text-center space-y-2.5 group shadow-sm"
               >
-                <div className="w-16 h-16 rounded-full mx-auto bg-[var(--surface-secondary)] flex items-center justify-center border border-[var(--border-subtle)] overflow-hidden">
-                  <Users className="w-7 h-7 text-[var(--text-muted)] group-hover:text-[var(--accent)] transition-colors" />
-                </div>
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">
-                    {artist.name}
-                  </h4>
-                  <p className="text-[10px] text-[var(--text-muted)]">
-                    {artist.trackCount} tracks
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {exploreTab === 'albums' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-            {albums.map((album) => (
-              <div
-                key={album.id}
-                onClick={() => setSelectedAlbum(album)}
-                className="group p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all space-y-2 shadow-sm"
-              >
-                <div className="aspect-square rounded-lg bg-[var(--surface-secondary)] relative overflow-hidden flex items-center justify-center border border-[var(--border-subtle)]">
-                  {album.coverArtUrl ? (
-                    <img src={album.coverArtUrl} alt={album.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <Disc className="w-8 h-8 text-[var(--text-muted)]" />
-                  )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <div className="w-8 h-8 rounded-full btn-primary flex items-center justify-center shadow-lg">
-                      <Play className="w-4 h-4 fill-current ml-0.5 text-[var(--btn-text)]" />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-0.5">
-                  <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{album.title}</h4>
-                  <p className="text-[11px] text-[var(--text-secondary)] truncate">{album.artist}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {exploreTab === 'genres' && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {genres.map((genre) => (
-              <div
-                key={genre.name}
-                onClick={() => setSelectedGenre(genre)}
-                className="p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all flex items-center justify-between gap-2 group shadow-sm"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <Tag className="w-3.5 h-3.5 text-[var(--accent)] shrink-0" />
-                  <span className="text-xs font-semibold text-[var(--text-primary)] truncate">
-                    {genre.name}
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[var(--surface-secondary)] text-[var(--text-muted)] shrink-0">
-                  {genre.trackCount}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    );
-  };
-
-  // Section 8: Rediscover Unplayed & Forgotten Music
-  const renderUnplayedForgotten = () => {
-    if (!unplayedData) return null;
-
-    let activeList: Track[] = [];
-    let titleDescription = '';
-
-    if (unplayedTab === 'never') {
-      activeList = unplayedData.neverPlayed;
-      titleDescription = 'Songs in your library that have zero recorded plays';
-    } else if (unplayedTab === 'forgotten') {
-      activeList = unplayedData.forgottenFavorites;
-      titleDescription = 'Favorite songs you have not listened to in a while';
-    } else {
-      activeList = unplayedData.highlyRatedRarelyPlayed;
-      titleDescription = 'Songs rated 4–5 stars that have fewer than 3 plays';
-    }
-
-    if (activeList.length === 0) return null;
-
-    return (
-      <section className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <RotateCcw className="w-4 h-4 text-emerald-400" /> Rediscover Your Collection
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">{titleDescription}</p>
-          </div>
-
-          <div className="flex rounded-lg overflow-hidden border border-[var(--border)] p-1 bg-[var(--surface)]">
-            <button
-              type="button"
-              onClick={() => setUnplayedTab('never')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                unplayedTab === 'never'
-                  ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Never Played ({unplayedData.neverPlayed.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setUnplayedTab('forgotten')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                unplayedTab === 'forgotten'
-                  ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Forgotten Favorites ({unplayedData.forgottenFavorites.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setUnplayedTab('rarely')}
-              className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                unplayedTab === 'rarely'
-                  ? 'bg-[var(--accent)] text-[var(--btn-text)] shadow-sm'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
-            >
-              Rarely Played ({unplayedData.highlyRatedRarelyPlayed.length})
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {activeList.slice(0, itemsLimit).map((track) => (
-            <div
-              key={track.id}
-              onClick={() => handleSafePlayTrack(track, activeList)}
-              className="group p-3 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all space-y-2 shadow-sm"
-            >
-              <div className="aspect-square rounded-lg bg-[var(--surface-secondary)] relative overflow-hidden flex items-center justify-center border border-[var(--border-subtle)]">
-                {track.coverArtUrl ? (
-                  <img src={track.coverArtUrl} alt={track.title} className="w-full h-full object-cover" />
-                ) : (
-                  <Music2 className="w-8 h-8 text-[var(--text-muted)]" />
-                )}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <div className="w-8 h-8 rounded-full btn-primary flex items-center justify-center shadow-lg">
-                    <Play className="w-4 h-4 fill-current ml-0.5 text-[var(--btn-text)]" />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-0.5">
-                <h4 className="text-xs font-bold text-[var(--text-primary)] truncate">{track.title}</h4>
-                <p className="text-[11px] text-[var(--text-secondary)] truncate">{track.artist}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 9: Quick Collections & Pinned Playlists
-  const renderQuickCollections = () => {
-    const listToDisplay = pinnedPlaylists.length > 0 ? pinnedPlaylists : recentPlaylists;
-    if (listToDisplay.length === 0) return null;
-
-    return (
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Pin className="w-4 h-4 text-amber-400" /> Quick Collections &amp; Playlists
-            </h2>
-            <p className="text-xs text-[var(--text-muted)]">
-              {pinnedPlaylists.length > 0 ? 'Your pinned playlists' : 'Recently updated playlists'}
-            </p>
-          </div>
-          {onNavigate && (
-            <button
-              onClick={() => onNavigate('playlists')}
-              className="text-xs font-semibold text-[var(--accent)] hover:underline flex items-center gap-1"
-            >
-              View All <ChevronRight className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-          {listToDisplay.map((playlist) => (
-            <div
-              key={playlist.id}
-              onClick={() => handleSafePlayPlaylist(playlist)}
-              className="group p-4 rounded-xl bg-[var(--surface-card)] border border-[var(--border-subtle)] hover:border-[var(--accent)] cursor-pointer transition-all flex items-center justify-between gap-3 shadow-sm"
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-11 h-11 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border)] shrink-0 flex items-center justify-center text-[var(--accent)]">
-                  <Disc className="w-6 h-6" />
+                <div className="w-20 h-20 mx-auto rounded-full overflow-hidden bg-purple-600/20 border-2 border-purple-500/40 flex items-center justify-center text-purple-300 font-black text-xl shadow-md group-hover:scale-105 transition-transform">
+                  <Users className="w-8 h-8" />
                 </div>
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-[var(--text-primary)] truncate group-hover:text-[var(--accent)]">
-                    {playlist.name}
+                  <h4 className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-purple-300 transition-colors">
+                    {artist.name}
                   </h4>
-                  <p className="text-[11px] text-[var(--text-muted)]">
-                    {playlist.songCount || 0} songs • {playlist.type === 'smart' ? 'Smart' : 'Custom'}
+                  <p className="text-[11px] text-[var(--text-muted)] font-mono">
+                    {artist.trackCount} song{artist.trackCount !== 1 ? 's' : ''}
                   </p>
                 </div>
               </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => handleTogglePinPlaylist(playlist.id, e)}
-                  className={`p-1.5 rounded-lg border transition-colors ${
-                    playlist.isPinned
-                      ? 'bg-amber-400/20 border-amber-400/40 text-amber-300'
-                      : 'border-transparent text-[var(--text-muted)] hover:text-[var(--text-primary)]'
-                  }`}
-                  title={playlist.isPinned ? 'Unpin' : 'Pin to Home'}
-                >
-                  <Pin className="w-3.5 h-3.5" />
-                </button>
-                <div className="w-7 h-7 rounded-full btn-primary flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Play className="w-3.5 h-3.5 fill-current ml-0.5 text-[var(--btn-text)]" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  };
-
-  // Section 10: Listening Insights & Statistics Summary
-  const renderListeningInsights = () => {
-    if (!insights) return null;
-
-    return (
-      <section className="space-y-4">
-        <div className="p-6 rounded-2xl bg-gradient-to-r from-[var(--surface-secondary)] to-[var(--surface-card)] border border-[var(--border)] flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm">
-          <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-[var(--surface)] text-[var(--accent)] text-[10px] font-mono border border-[var(--border)]">
-              <BarChart3 className="w-3.5 h-3.5" />
-              <span>Offline Listening Analytics</span>
-            </div>
-            <h3 className="text-lg font-bold text-[var(--text-primary)]">
-              Your Music Habits at a Glance
-            </h3>
-            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-              In the past 30 days, you listened to{' '}
-              <strong className="text-[var(--text-primary)]">
-                {insights.topArtist ? insights.topArtist.name : 'your music library'}
-              </strong>{' '}
-              and logged {insights.completedSessionsCount} sessions without sending any data to the cloud.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-4 shrink-0">
-            <Button
-              variant="primary"
-              size="md"
-              icon={<BarChart3 className="w-4 h-4" />}
-              onClick={() => setIsStatsModalOpen(true)}
-            >
-              View Full Analytics
-            </Button>
-          </div>
-        </div>
-      </section>
-    );
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // SECTION MAPPER
-  // ─────────────────────────────────────────────────────────────
-
-  const renderSectionById = (id: string) => {
-    switch (id) {
-      case 'greeting_quick_access':
-        return renderGreetingQuickAccess();
-      case 'continue_listening':
-        return renderContinueListening();
-      case 'daily_mixes':
-        return renderDailyMixes();
-      case 'made_for_you':
-        return renderMadeForYou();
-      case 'recently_added':
-        return renderRecentlyAdded();
-      case 'most_played':
-        return renderMostPlayed();
-      case 'explore_library':
-        return renderExploreLibrary();
-      case 'unplayed_forgotten':
-        return renderUnplayedForgotten();
-      case 'quick_collections':
-        return renderQuickCollections();
-      case 'listening_insights':
-        return renderListeningInsights();
-      default:
-        return null;
-    }
-  };
-
-  return (
-    <div className="flex-1 overflow-y-auto p-3 sm:p-5 md:p-8 space-y-4 sm:space-y-6 md:space-y-8 select-none">
-      {/* Prominent Search Input Entrypoint */}
-      {renderSearchBar()}
-
-      {/* Empty State when Library has 0 Songs */}
-      {!isLoading && tracks.length === 0 && (
-        <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-[var(--surface-secondary)] flex items-center justify-center text-[var(--accent)] border border-[var(--border)] shadow-inner">
-            <Music2 className="w-8 h-8" />
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-xl font-bold text-[var(--text-primary)]">No local music yet</h3>
-            <p className="text-xs text-[var(--text-secondary)] max-w-md">
-              Index your local music directory to populate personalized mixes, recommendations,
-              recently added tracks, and acoustic insights.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Button
-              variant="primary"
-              size="md"
-              icon={<FolderOpen className="w-4 h-4" />}
-              onClick={onOpenFolder}
-            >
-              Add Music Folder
-            </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              icon={<PlusCircle className="w-4 h-4" />}
-              onClick={onAddMusic}
-            >
-              Add Audio Files
-            </Button>
-          </div>
+            ))
+          )}
         </div>
       )}
 
-      {/* Render Dynamic Sections Based on Section Order & Preferences */}
-      {dashboardSettings.sectionOrder.map((sectionId) => {
-        const isEnabled = dashboardSettings.enabledSections[sectionId] !== false;
-        if (!isEnabled) return null;
+      {/* TAB E: VIDEOS */}
+      {activeTab === 'videos' && (
+        <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-4">
+          <Video className="w-12 h-12 text-purple-400 mx-auto opacity-50" />
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-white">Music Videos &amp; Streaming</h3>
+            <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
+              Stream or cache online music videos without tracking.
+            </p>
+          </div>
+          <button
+            onClick={onNavigateToOnline}
+            className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold transition-all shadow-md inline-flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" /> Open Online Music Discovery
+          </button>
+        </div>
+      )}
 
-        const rendered = renderSectionById(sectionId);
-        if (!rendered) return null;
+      {/* Track Context Menu */}
+      {contextMenuState && (
+        <ContextMenu
+          x={contextMenuState.x}
+          y={contextMenuState.y}
+          track={contextMenuState.track}
+          onClose={() => setContextMenuState(null)}
+          onPlay={(track) => playTrack(track, processedTracks)}
+          onPlayNext={(track) => playNext(track)}
+          onAddToQueue={(track) => addToQueue(track)}
+          onAddToPlaylist={(track) => setPlaylistModalTracks([track])}
+          onToggleFavorite={(track) => toggleFavorite(track.id)}
+          onShowProperties={(track) => setSelectedTrackForInfo(track)}
+        />
+      )}
 
-        return <React.Fragment key={sectionId}>{rendered}</React.Fragment>;
-      })}
+      {/* Add To Playlist Modal */}
+      {playlistModalTracks && (
+        <AddToPlaylistModal
+          isOpen={true}
+          trackOrTracks={playlistModalTracks}
+          onClose={() => setPlaylistModalTracks(null)}
+        />
+      )}
 
-      {/* Interactive Detail Modals */}
-      <ArtistDetailsModal
-        artist={selectedArtist}
-        isOpen={Boolean(selectedArtist)}
-        onClose={() => setSelectedArtist(null)}
-      />
+      {/* Album Details Modal */}
+      {selectedAlbum && (
+        <AlbumDetailsModal
+          isOpen={true}
+          album={selectedAlbum}
+          onClose={() => setSelectedAlbum(null)}
+        />
+      )}
 
-      <AlbumDetailsModal
-        album={selectedAlbum}
-        isOpen={Boolean(selectedAlbum)}
-        onClose={() => setSelectedAlbum(null)}
-      />
+      {/* Artist Details Modal */}
+      {selectedArtist && (
+        <ArtistDetailsModal
+          isOpen={true}
+          artist={selectedArtist}
+          onClose={() => setSelectedArtist(null)}
+        />
+      )}
 
-      <GenreDetailsModal
-        genre={selectedGenre}
-        isOpen={Boolean(selectedGenre)}
-        onClose={() => setSelectedGenre(null)}
-      />
-
-      <TrackInfoModal
-        track={selectedTrackForInfo}
-        isOpen={Boolean(selectedTrackForInfo)}
-        onClose={() => setSelectedTrackForInfo(null)}
-      />
-
-      <HomeCustomizationModal
-        isOpen={isCustomizationOpen}
-        onClose={() => setIsCustomizationOpen(false)}
-        settings={dashboardSettings}
-        onSave={async (newSettings) => {
-          setDashboardSettings(newSettings);
-          await musicDiscoveryService.saveDashboardSettings(newSettings);
-        }}
-      />
-
-      <ListeningStatsModal
-        isOpen={isStatsModalOpen}
-        onClose={() => setIsStatsModalOpen(false)}
-      />
-
-      <MusicProfileModal
-        isOpen={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-      />
+      {/* Track Info Modal */}
+      {selectedTrackForInfo && (
+        <TrackInfoModal
+          isOpen={true}
+          track={selectedTrackForInfo}
+          onClose={() => setSelectedTrackForInfo(null)}
+        />
+      )}
     </div>
   );
 };

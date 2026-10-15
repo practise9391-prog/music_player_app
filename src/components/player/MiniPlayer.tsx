@@ -24,6 +24,7 @@ import {
   Check,
   FileText,
 } from 'lucide-react';
+import { generateVibrantCover } from '../../library/artworkCache';
 
 function formatTime(seconds: number): string {
   if (isNaN(seconds) || seconds < 0) return '00:00';
@@ -98,25 +99,17 @@ export const MiniPlayer: React.FC = () => {
       <div className="flex items-center gap-2.5 md:gap-4 min-w-0 flex-1 md:flex-none md:min-w-[220px] md:max-w-[320px]">
         <div
           onClick={() => setIsFullPlayerOpen(true)}
-          className="relative group w-11 h-11 md:w-14 md:h-14 rounded-xl overflow-hidden bg-[var(--surface-secondary)] border border-[var(--border)] shrink-0 cursor-pointer flex items-center justify-center shadow-md"
+          className="relative group w-11 h-11 md:w-13 md:h-13 rounded-full overflow-hidden bg-black/60 border-2 border-purple-500/40 shrink-0 cursor-pointer flex items-center justify-center shadow-lg"
         >
-          {currentTrack?.coverArtUrl ? (
-            <img
-              src={currentTrack.coverArtUrl}
-              alt={currentTrack.title}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-            />
-          ) : (
-            <Disc
-              className={`w-6 h-6 md:w-7 md:h-7 text-[var(--accent)] ${
-                isPlaying ? 'animate-spin' : ''
-              } transition-transform duration-1000`}
-              style={{ animationDuration: '4s' }}
-            />
-          )}
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-            <Maximize2 className="w-4 h-4 md:w-5 md:h-5 text-white" />
-          </div>
+          <img
+            src={currentTrack?.coverArtUrl || (currentTrack ? generateVibrantCover(currentTrack.title, currentTrack.artist) : '/icon.png')}
+            alt={currentTrack?.title || 'Mini player'}
+            className={`w-full h-full object-cover ${isPlaying ? 'animate-spin-slow' : ''}`}
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = currentTrack ? generateVibrantCover(currentTrack.title, currentTrack.artist) : '/icon.png';
+            }}
+          />
+          <div className="absolute inset-0 m-auto w-3 h-3 rounded-full bg-black/80 border border-purple-400" />
         </div>
 
         <div className="min-w-0 flex-1" onClick={() => setIsFullPlayerOpen(true)}>
