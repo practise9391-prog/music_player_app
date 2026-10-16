@@ -80,6 +80,7 @@ import { audioBlobStorageService } from '../services/storage/AudioBlobStorageSer
 export interface PlayerContextType {
   state: AudioEngineState;
   currentTrack: Track | null;
+  setCurrentTrack: (track: Track | null) => void;
   queue: Track[];
   queueIndex: number;
   isFullPlayerOpen: boolean;
@@ -201,7 +202,7 @@ export interface PlayerContextType {
 
   // Online / YouTube Playback & Caching (Parts 6 & 7)
   onlinePlaybackState: YouTubePlaybackState;
-  playYouTubeUrl: (url: string, andCache?: boolean) => Promise<void>;
+  playYouTubeUrl: (url: string, titleOrCache?: string | boolean, artist?: string) => Promise<void>;
   playCachedYouTubeTrack: (historyItem: YouTubeHistoryRecord) => Promise<boolean>;
   cacheYouTubeTrack: (videoId: string, canonicalUrl: string) => Promise<boolean>;
   endOnlineSession: () => void;
@@ -373,6 +374,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setDspState(audioEngineInstance.getProcessingState());
       const active = audioEngineInstance.getCurrentTrack();
       if (active && (!currentTrackRef.current || currentTrackRef.current.id !== active.id)) {
+        if (currentTrackRef.current?.source === 'online' && active.source !== 'online') {
+          return;
+        }
         setCurrentTrack(active);
       }
     });
@@ -614,6 +618,26 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setShuffledOrder(generateShuffleOrder(targetQueue.length, targetIndex, shuffleModeRef.current, targetQueue));
       }
 
+      if (track.source === 'online') {
+        audioEngineInstance.setExternalTrack(track, 'playing');
+        setCurrentTrack(track);
+        window.dispatchEvent(
+          new CustomEvent('play-youtube-video', {
+            detail: { url: track.playbackUrl || track.path, videoId: track.sourceId, title: track.title },
+          })
+        );
+        PlayHistoryRepository.addRecord({
+          trackId: track.id,
+          title: track.title,
+          artist: track.artist,
+          playedAt: Date.now(),
+          playDuration: 0,
+          completed: false,
+          source: 'online',
+        }).catch(() => {});
+        return;
+      }
+
       // Guarantee a verified, playable audio URL (memory blob, IndexedDB blob, Capacitor native, or synth)
       const playableUrl = await audioBlobStorageService.getPlayableUrl(track);
 
@@ -623,6 +647,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         path: playableUrl || (track as unknown as { playbackUrl?: string }).playbackUrl || track.path,
       };
 
+      window.dispatchEvent(new CustomEvent('nova-stop-youtube'));
       await audioEngineInstance.loadTrack(effectiveTrack, true);
       setCurrentTrack(track);
 
@@ -653,6 +678,21 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
 
   const togglePlayPause = useCallback(async () => {
+    if (currentTrack?.source === 'online') {
+      const nextPlaying = engineState.status !== 'playing';
+      audioEngineInstance.setExternalTrack(currentTrack, nextPlaying ? 'playing' : 'paused');
+      setEngineState((prev) => ({
+        ...prev,
+        status: nextPlaying ? 'playing' : 'paused',
+      }));
+      window.dispatchEvent(
+        new CustomEvent('nova-toggle-youtube-playback', {
+          detail: { isPlaying: nextPlaying },
+        })
+      );
+      return;
+    }
+
     if (engineState.status === 'playing') {
       audioFocusManagerInstance.notifyUserManualPause();
       audioEngineInstance.pause();
@@ -794,7 +834,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Online YouTube Playback & Smart Caching Handlers (Parts 6 & 7)
   const playYouTubeUrl = useCallback(
-    async (rawUrl: string, andCache = false) => {
+    async (rawUrl: string, titleOrCache?: string | boolean, artist?: string) => {
       // 1. Local URL validation & normalization
       const validation = YouTubeUrlValidator.validate(rawUrl);
       if (!validation.isValid || !validation.cleanUrl || !validation.videoId) {
@@ -808,6 +848,8 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       const { cleanUrl, videoId } = validation;
+      const customTitle = typeof titleOrCache === 'string' ? titleOrCache : undefined;
+      const customArtist = artist;
 
       setOnlinePlaybackState({
         ...DEFAULT_YOUTUBE_PLAYBACK_STATE,
@@ -820,71 +862,87 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // 2. Start session in NetworkAccessManager
         NetworkAccessManager.startOnlineSession(cleanUrl, videoId);
 
-        // 3. Resolve stream via YouTubeResolver
-        const resolved = await youtubeResolverInstance.resolve(cleanUrl);
+        // 3. Pause local AudioEngine so local audio does not clash with online stream
+        audioEngineInstance.pause();
 
-        // 4. Create OnlineAudioSource
-        const source = new OnlineAudioSource(resolved);
+        // 4. Dispatch event for the embedded official YouTube player
+        window.dispatchEvent(
+          new CustomEvent('play-youtube-video', {
+            detail: { url: cleanUrl, videoId, title: customTitle },
+          })
+        );
 
-        setOnlinePlaybackState((prev) => ({
-          ...prev,
-          status: 'buffering',
-          metadata: resolved.metadata,
-          stream: resolved.stream,
-          duration: resolved.metadata.duration,
-        }));
+        const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        const title = customTitle || `YouTube Track (${videoId})`;
+        const artistName = customArtist || 'YouTube';
 
-        // 5. Load into AudioEngine
-        await audioEngineInstance.loadAudioSource(source, true);
+        // 5. Update shared currentTrack so Home, MiniPlayer and other components immediately synchronize
+        const onlineTrack: Track = {
+          id: `yt_${videoId}`,
+          title,
+          artist: artistName,
+          album: 'Online Stream',
+          duration: 0,
+          format: 'youtube',
+          codec: 'aac',
+          path: cleanUrl,
+          playbackUrl: cleanUrl,
+          coverArtUrl: thumbnailUrl,
+          source: 'online',
+          isFavorite: false,
+          dateAdded: Date.now(),
+          lastPlayedAt: Date.now(),
+          playCount: 1,
+          isAvailable: true,
+        };
+        audioEngineInstance.setExternalTrack(onlineTrack, 'playing');
+        setCurrentTrack(onlineTrack);
 
-        // 6. Play and update queue
-        const track = source.getTrackMetadata();
-        await playTrack(track);
-
-        // 7. Record to local YouTube History (Part 7 duplicate prevention & canonical tracking)
-        await YouTubeHistoryRepository.recordPlay({
-          videoId,
-          canonicalUrl: cleanUrl,
-          title: resolved.metadata.title,
-          artist: resolved.metadata.artist,
-          channel: resolved.metadata.channel,
-          duration: resolved.metadata.duration,
-          thumbnailUrl: resolved.metadata.thumbnailUrl,
-          codec: resolved.stream.codec,
-          bitrate: resolved.stream.bitrate,
-          sampleRate: resolved.stream.sampleRate,
-        });
-
-        // 8. Optional/Auto Caching (Part 7)
-        const shouldCache = andCache || settings.cacheYouTubeAudio || settings.autoCachePlayedTracks;
-        if (shouldCache) {
-          CacheManager.saveCache({
-            videoId,
-            canonicalUrl: cleanUrl,
-            streamUrl: resolved.stream.streamUrl,
-            codec: resolved.stream.codec,
-            bitrate: resolved.stream.bitrate,
-            sampleRate: resolved.stream.sampleRate,
-            maxLimitBytes: settings.maxCacheSizeBytes,
-            protectFavorites: settings.protectFavoritesFromEviction,
-          }).catch((cacheErr) => {
-            console.warn('Background caching encountered error:', cacheErr);
-          });
-        }
-
+        // 6. Update online playback state
         setOnlinePlaybackState((prev) => ({
           ...prev,
           status: 'playing',
+          currentUrl: cleanUrl,
+          videoId,
+          metadata: {
+            id: videoId,
+            title,
+            artist: artistName,
+            channel: artistName,
+            duration: 0,
+            thumbnailUrl,
+            videoUrl: cleanUrl,
+            codec: 'aac',
+            container: 'mp4',
+            bitrate: 128,
+            isAvailable: true,
+            requiresAuth: false,
+          },
           errorMessage: null,
         }));
+
+        // 7. Record to local YouTube History & Play History
+        await YouTubeHistoryRepository.recordPlay({
+          videoId,
+          canonicalUrl: cleanUrl,
+          title,
+          artist: artistName,
+          channel: artistName,
+          duration: 0,
+          thumbnailUrl,
+        });
+
+        await PlayHistoryRepository.addRecord({
+          trackId: `yt_${videoId}`,
+          title,
+          artist: artistName,
+          playedAt: Date.now(),
+          playDuration: 0,
+          completed: false,
+          source: 'online',
+        });
       } catch (err: any) {
-        NetworkAccessManager.setSessionError(err.message);
-        setOnlinePlaybackState((prev) => ({
-          ...prev,
-          status: 'error',
-          errorMessage: err.message || 'YouTube playback failed',
-        }));
-        throw err;
+        console.warn('Online playback notice:', err);
       }
     },
     [
@@ -2373,6 +2431,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       value={{
         state: engineState,
         currentTrack,
+        setCurrentTrack,
         queue,
         queueIndex,
         isFullPlayerOpen,

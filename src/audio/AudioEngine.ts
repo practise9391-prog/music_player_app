@@ -67,6 +67,14 @@ export class AudioEngine {
   constructor() {
     if (typeof window !== 'undefined') {
       this.initAudioElement();
+      const unlockAudioCtx = () => {
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+          this.audioCtx.resume().catch(() => {});
+        }
+      };
+      window.addEventListener('click', unlockAudioCtx, { passive: true });
+      window.addEventListener('touchstart', unlockAudioCtx, { passive: true });
+      window.addEventListener('keydown', unlockAudioCtx, { passive: true });
     }
   }
 
@@ -339,6 +347,14 @@ export class AudioEngine {
 
     if (this.audioElement) {
       const streamUrl = track.playbackUrl || track.path;
+      if (!streamUrl) {
+        this.status = 'error';
+        this.error = 'Audio source could not be resolved or file was moved.';
+        this.emit('PLAYBACK_ERROR', this.error);
+        this.notify();
+        return;
+      }
+
       const isRemoteHttp =
         (streamUrl.startsWith('http://') || streamUrl.startsWith('https://')) &&
         !streamUrl.includes('localhost') &&
@@ -352,6 +368,7 @@ export class AudioEngine {
       }
 
       this.audioElement.src = streamUrl;
+      this.audioElement.volume = this.isMuted ? 0 : this.volume;
       this.audioElement.playbackRate = this.playbackRate;
       this.audioElement.currentTime = initialPosition;
 
@@ -384,7 +401,29 @@ export class AudioEngine {
     this.notify();
   }
 
+  /**
+   * Synchronizes an external track (e.g. YouTube stream or web player)
+   * into the AudioEngine state so Home, MiniPlayer, and FullPlayerModal immediately reflect it.
+   */
+  public setExternalTrack(track: Track | null, status: PlaybackStatus = 'playing'): void {
+    if (this.audioElement && !this.audioElement.paused) {
+      this.audioElement.pause();
+    }
+    this.currentTrack = track;
+    this.status = status;
+    if (track) {
+      this.processor.visualizerEngine.setTrackMetadata(track);
+    }
+    this.notify();
+  }
+
   public async play(): Promise<void> {
+    if (this.currentTrack?.source === 'online') {
+      this.status = 'playing';
+      this.notify();
+      return;
+    }
+
     if (!this.audioElement || !this.currentTrack) return;
 
     if (!this.isAudioGraphInitialized) {
@@ -419,6 +458,12 @@ export class AudioEngine {
   }
 
   public pause(): void {
+    if (this.currentTrack?.source === 'online') {
+      this.status = 'paused';
+      this.notify();
+      return;
+    }
+
     if (!this.audioElement) return;
     this.audioElement.pause();
     this.status = 'paused';

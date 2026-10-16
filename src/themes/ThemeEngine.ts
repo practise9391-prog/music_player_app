@@ -7,6 +7,31 @@ export class ThemeEngine {
   constructor() {
     this.currentConfig = this.loadInitialTheme();
     this.applyTheme(this.currentConfig);
+    this.initSystemThemeListener();
+  }
+
+  private initSystemThemeListener(): void {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    try {
+      const mql = window.matchMedia('(prefers-color-scheme: dark)');
+      const handleSystemChange = (e: MediaQueryListEvent | MediaQueryList) => {
+        if (this.currentConfig.mode === 'system') {
+          if (e.matches) {
+            this.currentConfig = { ...THEME_PRESETS.Midnight, mode: 'system' };
+          } else {
+            this.currentConfig = { ...LIGHT_THEME, mode: 'system' };
+          }
+          this.applyTheme(this.currentConfig);
+        }
+      };
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', handleSystemChange);
+      } else if (typeof mql.addListener === 'function') {
+        mql.addListener(handleSystemChange);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   private loadInitialTheme(): ThemeConfig {
@@ -98,6 +123,11 @@ export class ThemeEngine {
     this.saveAndApply();
   }
 
+  public setDensity(density: 'compact' | 'comfortable' | 'spacious'): void {
+    this.currentConfig.density = density;
+    this.saveAndApply();
+  }
+
   private saveAndApply(): void {
     if (typeof window !== 'undefined') {
       try {
@@ -149,6 +179,7 @@ export class ThemeEngine {
     root.style.setProperty('--btn-opacity', String(button.opacity));
 
     // Global styles
+    root.setAttribute('data-density', config.density || 'comfortable');
     root.style.setProperty('--radius', config.borderRadius);
     root.style.setProperty('--glass-blur', config.glassBlur);
     root.style.setProperty('--shadow-intensity', String(config.shadowIntensity));

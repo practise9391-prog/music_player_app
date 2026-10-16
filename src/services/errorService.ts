@@ -53,11 +53,15 @@ class NotificationServiceImpl {
   }
 
   public success(title: string, message: string): string {
-    return this.show({ type: 'success', title, message });
+    // Ordinary success notifications are silent per user requirements
+    console.debug(`[Notification:Success] ${title}: ${message}`);
+    return '';
   }
 
   public info(title: string, message: string): string {
-    return this.show({ type: 'info', title, message });
+    // Ordinary info notifications are silent per user requirements
+    console.debug(`[Notification:Info] ${title}: ${message}`);
+    return '';
   }
 
   public dismiss(id: string): void {

@@ -25,6 +25,7 @@ import { PlaylistRepository } from '../../database/repository';
 export type NavRoute =
   | 'home'
   | 'library'
+  | 'albums'
   | 'playlists'
   | 'history'
   | 'favorites'
@@ -83,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }[] = [
     { route: 'home', label: 'Home', icon: Home },
     { route: 'library', label: 'Library', icon: Music2 },
+    { route: 'albums', label: 'Albums', icon: Disc3 },
     { route: 'playlists', label: 'Playlists', icon: ListMusic },
     { route: 'history', label: 'History', icon: History },
     { route: 'favorites', label: 'Favorites', icon: Heart },
@@ -264,8 +266,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Network Air-Gap Privacy Card (Section 4) */}
+      {/* User Profile Footer (Melo Design) */}
       <div className="space-y-3 pt-3 border-t border-[var(--border-subtle)] shrink-0">
+        <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-pink-600 flex items-center justify-center text-white font-bold text-xs shadow-md shrink-0">
+              P
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-white truncate">Pavan Kumar</div>
+              <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Online</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Network Air-Gap Privacy Card (Section 4) */}
         <div
           onClick={onOpenNetworkModal}
           className={`p-3 rounded-xl border transition-all cursor-pointer group ${

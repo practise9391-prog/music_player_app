@@ -18,6 +18,9 @@ const FORMAT_MIME_MAP: Record<AudioFormat, { mime: string; lossless: boolean; no
   m4a: { mime: 'audio/mp4; codecs="mp4a.40.2"', lossless: false, notes: 'MPEG-4 Audio AAC' },
   aac: { mime: 'audio/aac', lossless: false, notes: 'Advanced Audio Coding' },
   webm: { mime: 'audio/webm; codecs="opus"', lossless: false, notes: 'WebM Audio Container' },
+  wma: { mime: 'audio/x-ms-wma', lossless: false, notes: 'Windows Media Audio' },
+  mp4: { mime: 'video/mp4', lossless: false, notes: 'MPEG-4 Audio/Video Container' },
+  mkv: { mime: 'video/x-matroska', lossless: false, notes: 'Matroska Audio/Video Container' },
 };
 
 export class AudioCapabilityDetector {

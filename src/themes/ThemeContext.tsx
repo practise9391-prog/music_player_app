@@ -11,6 +11,7 @@ interface ThemeContextType {
   updateButton: (button: Partial<ButtonCustomization>) => void;
   setGlassEffect: (enabled: boolean) => void;
   setBorderRadius: (radius: string) => void;
+  setDensity: (density: 'compact' | 'comfortable' | 'spacious') => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -57,6 +58,11 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setTheme({ ...themeEngine.getTheme() });
   };
 
+  const setDensity = (density: 'compact' | 'comfortable' | 'spacious') => {
+    themeEngine.setDensity(density);
+    setTheme({ ...themeEngine.getTheme() });
+  };
+
   return (
     <ThemeContext.Provider
       value={{
@@ -68,6 +74,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         updateButton,
         setGlassEffect,
         setBorderRadius,
+        setDensity,
       }}
     >
       {children}

@@ -10,6 +10,11 @@ import android.os.Build;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import androidx.core.content.ContextCompat;
+import android.media.MediaMetadataRetriever;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.HashMap;
+import java.util.Map;
 import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -116,7 +121,11 @@ public class MediaStoreScannerPlugin extends Plugin {
                         MediaStore.Audio.Media.DATA + " LIKE '%.m4a' OR " +
                         MediaStore.Audio.Media.DATA + " LIKE '%.wav' OR " +
                         MediaStore.Audio.Media.DATA + " LIKE '%.aac' OR " +
-                        MediaStore.Audio.Media.DATA + " LIKE '%.ogg') AND " +
+                        MediaStore.Audio.Media.DATA + " LIKE '%.ogg' OR " +
+                        MediaStore.Audio.Media.DATA + " LIKE '%.opus' OR " +
+                        MediaStore.Audio.Media.DATA + " LIKE '%.wma' OR " +
+                        MediaStore.Audio.Media.DATA + " LIKE '%.mp4' OR " +
+                        MediaStore.Audio.Media.DATA + " LIKE '%.mkv') AND " +
                         MediaStore.Audio.Media.DURATION + " >= 5000";
 
                 String sortOrder = MediaStore.Audio.Media.TITLE + " ASC";
@@ -140,6 +149,7 @@ public class MediaStoreScannerPlugin extends Plugin {
                     int dateModifiedCol = cursor.getColumnIndex(MediaStore.Audio.Media.DATE_MODIFIED);
                     int displayNameCol = cursor.getColumnIndex(MediaStore.Audio.Media.DISPLAY_NAME);
                     int albumIdCol = cursor.getColumnIndex(MediaStore.Audio.Media.ALBUM_ID);
+                    Map<Long, String> albumArtCache = new HashMap<>();
 
                     while (cursor.moveToNext()) {
                         long id = idCol != -1 ? cursor.getLong(idCol) : 0;
@@ -175,8 +185,17 @@ public class MediaStoreScannerPlugin extends Plugin {
                         trackObj.put("contentUri", contentUri.toString());
 
                         if (albumId >= 0) {
-                            Uri albumArtUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId);
-                            trackObj.put("albumArtUri", albumArtUri.toString());
+                            String artPath = albumArtCache.get(albumId);
+                            if (artPath == null && !albumArtCache.containsKey(albumId)) {
+                                artPath = extractAlbumArt(path, albumId);
+                                albumArtCache.put(albumId, artPath);
+                            }
+                            if (artPath != null && !artPath.isEmpty()) {
+                                trackObj.put("albumArtUri", artPath);
+                            } else {
+                                Uri albumArtUri = ContentUris.withAppendedId(Uri.parse("content://media/external/audio/albumart"), albumId);
+                                trackObj.put("albumArtUri", albumArtUri.toString());
+                            }
                         }
 
                         audioArray.put(trackObj);
@@ -196,4 +215,40 @@ public class MediaStoreScannerPlugin extends Plugin {
             }
         });
     }
+
+    private String extractAlbumArt(String filePath, long albumId) {
+        if (filePath == null || filePath.isEmpty()) return null;
+        try {
+            File cacheDir = new File(getContext().getCacheDir(), "album_thumbs");
+            if (!cacheDir.exists()) {
+                cacheDir.mkdirs();
+            }
+            File thumbFile = new File(cacheDir, "album_" + albumId + ".jpg");
+            if (thumbFile.exists() && thumbFile.length() > 0) {
+                return thumbFile.getAbsolutePath();
+            }
+            File audioFile = new File(filePath);
+            if (audioFile.exists()) {
+                MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                try {
+                    mmr.setDataSource(filePath);
+                    byte[] art = mmr.getEmbeddedPicture();
+                    if (art != null && art.length > 0) {
+                        FileOutputStream fos = new FileOutputStream(thumbFile);
+                        fos.write(art);
+                        fos.flush();
+                        fos.close();
+                        return thumbFile.getAbsolutePath();
+                    }
+                } catch (Exception ignored) {
+                } finally {
+                    try {
+                        mmr.release();
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
 }
+

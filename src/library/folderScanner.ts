@@ -14,6 +14,9 @@ const SUPPORTED_EXTENSIONS = new Set([
   'ogg',
   'opus',
   'webm',
+  'wma',
+  'mp4',
+  'mkv',
 ]);
 
 export interface ScanOptions {

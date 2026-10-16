@@ -1,11 +1,11 @@
 {
-  "name": "Nova Music Player",
-  "short_name": "Nova Music",
+  "name": "Melo Music Player",
+  "short_name": "Melo Music",
   "description": "High-fidelity, offline-first music player with advanced audio engine, spatial audio, and synchronized lyrics.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0b10",
-  "theme_color": "#00e5ff",
+  "background_color": "#09090e",
+  "theme_color": "#a855f7",
   "icons": [
     {
       "src": "/favicon.svg",

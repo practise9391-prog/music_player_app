@@ -1,40 +1,43 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0b10;
-  --surface: #12141e;
-  --surface-secondary: #191c2b;
-  --surface-card: #151824;
-  --sidebar-bg: #0e1017;
-  --border: #24283b;
-  --border-subtle: #1b1e2c;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --accent: #00f0ff;
-  --accent-hover: #38f5ff;
-  --accent-glow: rgba(0, 240, 255, 0.35);
-  --progress-bg: rgba(255, 255, 255, 0.1);
-  --progress-fill: #00f0ff;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --background: #090B14;
+  --surface: #101426;
+  --surface-secondary: #171C32;
+  --surface-card: #171C32;
+  --surface-hover: #222944;
+  --sidebar-bg: #0D1020;
+  --border: #272D46;
+  --border-subtle: #1C223A;
+  --text-primary: #F8FAFC;
+  --text-secondary: #A1A9C3;
+  --text-muted: #68718B;
+  --accent: #8B5CF6;
+  --accent-hover: #A78BFA;
+  --accent-secondary: #22D3EE;
+  --accent-pink: #F472B6;
+  --accent-glow: rgba(139, 92, 246, 0.45);
+  --progress-bg: rgba(255, 255, 255, 0.12);
+  --progress-fill: #8B5CF6;
+  --success: #A3E635;
+  --warning: #F59E0B;
+  --danger: #FB7185;
 
-  --btn-bg: #00f0ff;
-  --btn-hover: #38f5ff;
-  --btn-pressed: #00b8cc;
-  --btn-text: #05070e;
-  --btn-border: rgba(0, 240, 255, 0.4);
+  --btn-bg: #8B5CF6;
+  --btn-hover: #A78BFA;
+  --btn-pressed: #7C3AED;
+  --btn-text: #ffffff;
+  --btn-border: rgba(139, 92, 246, 0.4);
   --btn-border-width: 1px;
-  --btn-glow-color: rgba(0, 240, 255, 0.5);
-  --btn-glow-spread: 10px;
-  --btn-radius: 8px;
+  --btn-glow-color: rgba(139, 92, 246, 0.5);
+  --btn-glow-spread: 12px;
+  --btn-radius: 9999px;
   --btn-scale: 1.0;
   --btn-opacity: 1.0;
 
-  --radius: 12px;
-  --glass-blur: 14px;
-  --shadow-intensity: 0.4;
+  --radius: 16px;
+  --glass-blur: 16px;
+  --shadow-intensity: 0.5;
 }
 
 * {
@@ -160,4 +163,22 @@ body {
 .animate-bounce-subtle {
   animation: bounce-subtle 2.5s ease-in-out infinite;
 }
+
+/* Reduced Motion Setting */
+.reduced-motion *,
+.reduced-motion *::before,
+.reduced-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
+
+/* UI Density Classes */
+[data-density='compact'] {
+  --radius: 10px;
+}
+[data-density='comfortable'] {
+  --radius: 16px;
+}
+
 

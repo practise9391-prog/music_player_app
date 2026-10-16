@@ -279,7 +279,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-12 px-4 bg-black/85 backdrop-blur-md animate-fade-in select-none">
       <div className="relative w-full max-w-3xl max-h-[88vh] flex flex-col rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] shadow-2xl overflow-hidden text-[var(--text-primary)]">
         {/* Top Search Input Bar */}
-        <div className="relative flex items-center px-3 sm:px-4 py-3 border-b border-[var(--border)] bg-[var(--surface)] gap-2">
+        <div className="relative flex items-center px-2.5 sm:px-4 py-2.5 sm:py-3 border-b border-[var(--border)] bg-[var(--surface)] gap-2">
           <button
             onClick={onClose}
             className="p-1.5 -ml-1 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors shrink-0 active:scale-95"
@@ -292,11 +292,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search songs, artists, albums, playlists, genres, folders... (Esc to close)"
+            placeholder="Search songs, artists, albums, playlists..."
             value={query}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none"
+            className="min-w-0 flex-1 min-w-[120px] sm:min-w-[180px] bg-transparent text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none py-1"
           />
 
           {query && (
@@ -306,7 +306,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                 setResults(null);
                 setSuggestions([]);
               }}
-              className="p-1 rounded-md text-[var(--text-muted)] hover:text-white"
+              className="p-1 rounded-md text-[var(--text-muted)] hover:text-white shrink-0"
               title="Clear input"
             >
               <X className="w-4 h-4" />
@@ -316,7 +316,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           {/* Filter Toggle Button */}
           <button
             onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+            className={`shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
               isFilterPanelOpen || activeFilterCount > 0
                 ? 'bg-[var(--accent)] text-[var(--btn-text)] border-[var(--accent)] shadow-sm'
                 : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] border-[var(--border)] hover:text-white'
@@ -324,7 +324,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
             title="Toggle Search Filters"
           >
             <Filter className="w-3.5 h-3.5" />
-            <span>Filters</span>
+            <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
               <span className="w-4 h-4 rounded-full bg-[var(--btn-text)] text-[var(--accent)] text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
@@ -334,11 +334,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
           <button
             onClick={onClose}
-            className="p-1 rounded-md text-[var(--text-muted)] hover:text-white"
+            className="shrink-0 p-1 rounded-md text-[var(--text-muted)] hover:text-white"
+            title="Close Search"
           >
-            <kbd className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-muted)]">
+            <kbd className="hidden sm:inline-block px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--surface-secondary)] border border-[var(--border)] text-[var(--text-muted)]">
               ESC
             </kbd>
+            <X className="w-5 h-5 sm:hidden" />
           </button>
         </div>
 
@@ -462,12 +464,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           </div>
         )}
 
-        {/* Category Tabs: All | Songs | Artists | Albums | Playlists | Folders | Online */}
+        {/* Category Tabs: All | Songs | Albums | Playlists | Folders | Online */}
         <div className="flex items-center gap-1 px-4 py-2 border-b border-[var(--border)] bg-[var(--surface)] overflow-x-auto text-xs font-semibold scrollbar-none">
           {[
             { id: 'all', label: 'All' },
             { id: 'songs', label: 'Songs', count: results?.songs.length },
-            { id: 'artists', label: 'Artists', count: results?.artists.length },
             { id: 'albums', label: 'Albums', count: results?.albums.length },
             { id: 'playlists', label: 'Playlists', count: results?.playlists.length },
             { id: 'folders', label: 'Folders', count: results?.folders.length },
@@ -626,7 +627,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         </span>
                       </div>
                       <div className="space-y-1 divide-y divide-[var(--border-subtle)] bg-[var(--surface)] rounded-xl border border-[var(--border-subtle)] overflow-hidden">
-                        {(activeTab === 'songs' ? results.songs : results.songs.slice(0, 5)).map(
+                        {(activeTab === 'songs' ? results.songs : results.songs.slice(0, 20)).map(
                           ({ track, matchedFields }) => {
                             const isCurrent = currentTrack?.id === track.id;
                             const isPlaying = isCurrent && playerState.status === 'playing';
@@ -809,6 +810,15 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                           }
                         )}
                       </div>
+                      {activeTab === 'all' && results.songs.length > 20 && (
+                        <button
+                          onClick={() => handleTabChange('songs')}
+                          className="w-full py-2 rounded-xl text-xs font-semibold text-[var(--accent)] hover:underline flex items-center justify-center gap-1 bg-[var(--surface)] border border-[var(--border-subtle)]"
+                        >
+                          <span>View all {results.songs.length} song matches</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   )}
 

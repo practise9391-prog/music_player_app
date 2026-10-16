@@ -216,29 +216,42 @@ export class YouTubeResolver {
       // offline or oembed unreachable
     }
 
-    // 2. Attempt resolving stream via public Piped API instances
-    const pipedEndpoints = [
-      `https://api.piped.privacy.com.de/streams/${videoId}`,
-      `https://pipedapi.kavin.rocks/streams/${videoId}`,
-      `https://pipedapi.tokhmi.xyz/streams/${videoId}`,
+    // 2. Attempt resolving stream via public Invidious and Piped API instances
+    const resolverEndpoints = [
+      { type: 'piped', url: `https://pipedapi.leptons.xyz/streams/${videoId}` },
+      { type: 'invidious', url: `https://inv.nadeko.net/api/v1/videos/${videoId}` },
+      { type: 'piped', url: `https://api.piped.privacy.com.de/streams/${videoId}` },
+      { type: 'invidious', url: `https://invidious.nerdvpn.de/api/v1/videos/${videoId}` },
+      { type: 'piped', url: `https://pipedapi.r4fo.com/streams/${videoId}` },
+      { type: 'invidious', url: `https://invidious.protokolla.fi/api/v1/videos/${videoId}` },
+      { type: 'invidious', url: `https://inv.tux.pizza/api/v1/videos/${videoId}` },
     ];
 
-    for (const ep of pipedEndpoints) {
+    for (const ep of resolverEndpoints) {
       if (streamUrl) break;
       try {
         const streamController = new AbortController();
-        const streamTimeout = setTimeout(() => streamController.abort(), 2000);
-        const res = await fetch(ep, { signal: streamController.signal });
+        const streamTimeout = setTimeout(() => streamController.abort(), 3500);
+        const res = await fetch(ep.url, { signal: streamController.signal });
         clearTimeout(streamTimeout);
         if (res.ok) {
           const data = await res.json();
           if (data.title) title = data.title;
-          if (data.uploader) uploader = data.uploader;
-          if (data.duration) duration = data.duration;
-          if (Array.isArray(data.audioStreams) && data.audioStreams.length > 0) {
+          if (data.uploader || data.author) uploader = data.uploader || data.author;
+          if (data.duration || data.lengthSeconds) duration = data.duration || data.lengthSeconds;
+
+          if (ep.type === 'piped' && Array.isArray(data.audioStreams) && data.audioStreams.length > 0) {
             const best = data.audioStreams.find((s: any) => s.mimeType?.includes('audio') || s.url) || data.audioStreams[0];
             if (best?.url) {
               streamUrl = best.url;
+            }
+          } else if (ep.type === 'invidious') {
+            const formats = data.adaptiveFormats || data.formatStreams || [];
+            const audioOnly = formats.find((f: any) => (f.type?.includes('audio') || f.mimeType?.includes('audio')) && f.url);
+            if (audioOnly?.url) {
+              streamUrl = audioOnly.url;
+            } else if (formats.length > 0 && formats[0].url) {
+              streamUrl = formats[0].url;
             }
           }
         }
@@ -247,16 +260,9 @@ export class YouTubeResolver {
       }
     }
 
-    // 3. If online stream couldn't be resolved (e.g. offline, rate-limited, or CORS), generate playable harmonic WAV
+    // 3. If online direct audio stream could not be scraped, fallback to embedded player stream URL
     if (!streamUrl) {
-      try {
-        // Import audioBlobStorageService dynamically to prevent circular dependencies
-        const { audioBlobStorageService } = await import('../storage/AudioBlobStorageService');
-        const fallbackBlob = audioBlobStorageService.createSyntheticHarmonicAudioBlob(duration);
-        streamUrl = audioBlobStorageService.registerBlobUrl(`yt_${videoId}`, fallbackBlob);
-      } catch {
-        streamUrl = `data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=`;
-      }
+      streamUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&enablejsapi=1`;
     }
 
     return {

@@ -22,13 +22,20 @@ import {
   Play,
 } from 'lucide-react';
 
+import { NavRoute } from '../components/layout/Sidebar';
+import { PlaybackNotificationService } from '../services/notification/PlaybackNotificationService';
+
 type SortOption = 'recent' | 'most_played' | 'oldest' | 'cached' | 'favorites';
 type FilterOption = 'all' | 'cached' | 'online_only' | 'favorites';
 
-export const HistoryPage: React.FC = () => {
+interface HistoryPageProps {
+  onNavigate?: (route: NavRoute) => void;
+}
+
+export const HistoryPage: React.FC<HistoryPageProps> = ({ onNavigate }) => {
   const { playCachedYouTubeTrack, playYouTubeUrl, playTrack } = usePlayer();
 
-  const [activeTab, setActiveTab] = useState<'local' | 'youtube'>('local');
+  const [activeTab, setActiveTab] = useState<'all' | 'local' | 'online'>('all');
   const [youtubeHistory, setYoutubeHistory] = useState<YouTubeHistoryRecord[]>([]);
   const [playHistory, setPlayHistory] = useState<PlayHistoryRecord[]>([]);
   const [tracksById, setTracksById] = useState<Map<string, Track>>(new Map());
@@ -40,7 +47,7 @@ export const HistoryPage: React.FC = () => {
 
   const loadData = async () => {
     const yt = await YouTubeHistoryRepository.getAll();
-    const local = await PlayHistoryRepository.getRecent(500);
+    const local = await PlayHistoryRepository.getAll();
     const allTracks = await TrackRepository.getAll();
     const tMap = new Map<string, Track>();
     allTracks.forEach((t) => tMap.set(t.id, t));
@@ -54,6 +61,29 @@ export const HistoryPage: React.FC = () => {
     loadData();
   }, []);
 
+  // Compute unique history entries per track
+  const uniqueHistory = useMemo(() => {
+    const map = new Map<string, PlayHistoryRecord>();
+    playHistory.forEach((rec) => {
+      const key = rec.trackId || `${rec.title}:::${rec.artist}:::${rec.source}`;
+      const existing = map.get(key);
+      if (!existing || rec.playedAt > existing.playedAt) {
+        map.set(key, rec);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => b.playedAt - a.playedAt);
+  }, [playHistory]);
+
+  const localCount = useMemo(
+    () => uniqueHistory.filter((r) => r.source !== 'online').length,
+    [uniqueHistory]
+  );
+  const onlineCount = useMemo(
+    () => uniqueHistory.filter((r) => r.source === 'online').length,
+    [uniqueHistory]
+  );
+  const allCount = localCount + onlineCount;
+
   // Daily de-duplicated and sorted Local Play History (Requirement 11)
   const groupedLocalHistory = useMemo(() => {
     const today = new Date();
@@ -63,7 +93,13 @@ export const HistoryPage: React.FC = () => {
 
     const dayMap = new Map<string, { label: string; dateSort: number; records: PlayHistoryRecord[] }>();
 
-    playHistory.forEach((rec) => {
+    const filteredRecords = playHistory.filter((rec) => {
+      if (activeTab === 'local') return rec.source !== 'online';
+      if (activeTab === 'online') return rec.source === 'online';
+      return true;
+    });
+
+    filteredRecords.forEach((rec) => {
       const d = new Date(rec.playedAt);
       const dayStart = new Date(d);
       dayStart.setHours(0, 0, 0, 0);
@@ -137,7 +173,7 @@ export const HistoryPage: React.FC = () => {
 
     result.sort((a, b) => b.dateSort - a.dateSort);
     return result;
-  }, [playHistory, tracksById]);
+  }, [playHistory, tracksById, activeTab]);
 
   // Filter & Search
   const filteredAndSorted = useMemo(() => {
@@ -221,7 +257,11 @@ export const HistoryPage: React.FC = () => {
 
   const handlePlayOnline = async (item: YouTubeHistoryRecord) => {
     try {
-      await playYouTubeUrl(item.youtube_url);
+      await playYouTubeUrl(item.youtube_url, item.title, item.channel || item.artist);
+      onNavigate?.('online');
+      if (PlaybackNotificationService.shouldNotify(item.youtube_video_id)) {
+        notificationService.success('Now Streaming Online', item.title);
+      }
     } catch (err: any) {
       notificationService.error('Online Playback Failed', err.message || 'Could not start stream');
     }
@@ -274,25 +314,46 @@ export const HistoryPage: React.FC = () => {
 
   const handlePlayLocalTrack = async (item: PlayHistoryRecord) => {
     try {
-      let track = await TrackRepository.getById(item.trackId);
+      let track = item.trackId ? await TrackRepository.getById(item.trackId) : null;
+      if (!track && tracksById.has(item.trackId)) {
+        track = tracksById.get(item.trackId)!;
+      }
       if (!track) {
-        track = {
-          id: item.trackId,
-          title: item.title,
-          artist: item.artist,
-          duration: item.playDuration || 0,
-          format: 'mp3',
-          dateAdded: item.playedAt,
-          playCount: 1,
-          isFavorite: false,
-          source: item.source || 'local',
-          path: item.trackId,
-        };
+        notificationService.error('Playback Failed', 'Local audio file could not be found or was moved.');
+        return;
       }
       await playTrack(track);
-      notificationService.success('Now Playing', `${track.title} - ${track.artist}`);
+      if (PlaybackNotificationService.shouldNotify(track.id)) {
+        notificationService.success('Now Playing', `${track.title} - ${track.artist}`);
+      }
     } catch (err: any) {
       notificationService.error('Replay Failed', err?.message || 'Could not play history track.');
+    }
+  };
+
+  const handleHistoryItemClick = async (item: {
+    trackId: string;
+    title: string;
+    artist: string;
+    source?: 'local' | 'online';
+    lastPlayedAt: number;
+    playCountToday: number;
+    track?: Track;
+  }) => {
+    if (item.source === 'online' || item.trackId?.startsWith('yt_')) {
+      const vid = item.trackId?.startsWith('yt_') ? item.trackId.slice(3) : item.trackId;
+      const url = item.track?.originalUrl || `https://www.youtube.com/watch?v=${vid}`;
+      try {
+        await playYouTubeUrl(url, item.title, item.artist);
+        onNavigate?.('online');
+        if (PlaybackNotificationService.shouldNotify(vid)) {
+          notificationService.success('Now Streaming Online', item.title);
+        }
+      } catch (err: any) {
+        notificationService.error('Online Playback Failed', err?.message || 'Could not start stream');
+      }
+    } else {
+      await handlePlayLocalTrack(item as unknown as PlayHistoryRecord);
     }
   };
 
@@ -315,84 +376,108 @@ export const HistoryPage: React.FC = () => {
           </p>
         </div>
 
-        {/* Tab switcher */}
-        <div className="flex items-center gap-2 p-1 rounded-xl bg-[var(--surface-card)] border border-[var(--border)]">
+        {/* Tab switcher: [ All ] [ Local ] [ Online ] (Melo Panel 5) */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-[var(--surface-card)] border border-[var(--border)]">
+          <button
+            onClick={() => setActiveTab('all')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'all'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)]'
+            }`}
+          >
+            <span>All</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeTab === 'all' ? 'bg-white/20' : 'bg-[var(--surface-secondary)]'}`}>
+              {allCount}
+            </span>
+          </button>
           <button
             onClick={() => setActiveTab('local')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
               activeTab === 'local'
-                ? 'bg-[var(--accent)] text-[var(--btn-text)]'
-                : 'text-[var(--text-secondary)] hover:text-white'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)]'
             }`}
           >
             <HistoryIcon className="w-3.5 h-3.5" />
-            <span>Local Play History ({playHistory.length})</span>
+            <span>Local</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeTab === 'local' ? 'bg-white/20' : 'bg-[var(--surface-secondary)]'}`}>
+              {localCount}
+            </span>
           </button>
           <button
-            onClick={() => setActiveTab('youtube')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors flex items-center gap-2 ${
-              activeTab === 'youtube'
-                ? 'bg-[var(--accent)] text-[var(--btn-text)]'
-                : 'text-[var(--text-secondary)] hover:text-white'
+            onClick={() => setActiveTab('online')}
+            className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeTab === 'online'
+                ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                : 'text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)]'
             }`}
           >
             <Globe className="w-3.5 h-3.5" />
-            <span>YouTube History ({youtubeHistory.length})</span>
+            <span>Online</span>
+            <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${activeTab === 'online' ? 'bg-white/20' : 'bg-[var(--surface-secondary)]'}`}>
+              {onlineCount}
+            </span>
           </button>
         </div>
       </div>
 
-      {activeTab === 'local' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-              Playback Activity ({playHistory.length})
-            </span>
-            {playHistory.length > 0 && (
-              <button
-                onClick={handleClearLocalHistory}
-                className="px-2.5 py-1 rounded-lg text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-1.5"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear History</span>
-              </button>
-            )}
-          </div>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+            {activeTab === 'all' ? 'All Activity' : activeTab === 'local' ? 'Local Tracks' : 'Online Streams'} ({
+              activeTab === 'all'
+                ? allCount
+                : activeTab === 'local'
+                ? localCount
+                : onlineCount
+            })
+          </span>
+          {playHistory.length > 0 && (
+            <button
+              onClick={handleClearLocalHistory}
+              className="px-2.5 py-1 rounded-lg text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors flex items-center gap-1.5"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Clear History</span>
+            </button>
+          )}
+        </div>
 
-          <div className="space-y-6">
-            {groupedLocalHistory.length === 0 ? (
-              <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-2">
-                <HistoryIcon className="w-8 h-8 text-[var(--text-muted)] mx-auto opacity-50" />
-                <div className="text-sm font-semibold text-[var(--text-primary)]">No Playback History Yet</div>
-                <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
-                  Play songs from your local library or online streams to track your listening journey.
-                </p>
-              </div>
-            ) : (
-              groupedLocalHistory.map((group) => (
-                <div key={group.label} className="space-y-2.5">
-                  <div className="flex items-center justify-between px-1">
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-2">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{group.label}</span>
-                      <span className="text-[10px] text-[var(--text-muted)] font-mono font-normal">
-                        ({group.items.length} song{group.items.length !== 1 ? 's' : ''})
-                      </span>
-                    </h3>
-                  </div>
+        <div className="space-y-6">
+          {groupedLocalHistory.length === 0 ? (
+            <div className="p-12 text-center rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] space-y-2">
+              <HistoryIcon className="w-8 h-8 text-[var(--text-muted)] mx-auto opacity-50" />
+              <div className="text-sm font-semibold text-[var(--text-primary)]">No Playback History Yet</div>
+              <p className="text-xs text-[var(--text-secondary)] max-w-sm mx-auto">
+                Play songs from your local library or online streams to track your listening journey.
+              </p>
+            </div>
+          ) : (
+            groupedLocalHistory.map((group) => (
+              <div key={group.label} className="space-y-2.5">
+                <div className="flex items-center justify-between px-1">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>{group.label}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono font-normal">
+                      ({group.items.length} song{group.items.length !== 1 ? 's' : ''})
+                    </span>
+                  </h3>
+                </div>
 
-                  <div className="space-y-2">
-                    {group.items.map((item) => {
-                      const coverUrl =
-                        item.track?.coverArtUrl ||
-                        generateVibrantCover(item.title, item.artist);
+                <div className="space-y-2">
+                  {group.items.map((item) => {
+                    const coverUrl =
+                      item.track?.coverArtUrl ||
+                      generateVibrantCover(item.title, item.artist);
 
-                      return (
-                        <div
-                          key={item.trackId || `${item.title}-${item.lastPlayedAt}`}
-                          onClick={() => handlePlayLocalTrack(item as unknown as PlayHistoryRecord)}
-                          className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs cursor-pointer group transition-all shadow-sm hover:border-[var(--accent)]"
-                        >
+                    return (
+                      <div
+                        key={item.trackId || `${item.title}-${item.lastPlayedAt}`}
+                        onClick={() => handleHistoryItemClick(item)}
+                        className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs cursor-pointer group transition-all shadow-sm hover:border-[var(--accent)]"
+                      >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
                             {/* Artwork Thumbnail */}
                             <div className="w-11 h-11 rounded-lg overflow-hidden shrink-0 relative bg-[var(--surface-secondary)] border border-[var(--border-subtle)]">
@@ -453,9 +538,8 @@ export const HistoryPage: React.FC = () => {
             )}
           </div>
         </div>
-      )}
 
-      {activeTab === 'youtube' && (
+      {activeTab === 'online' && (
         <>
           {/* Controls: Search, Filters, Sort */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">

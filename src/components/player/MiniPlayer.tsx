@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { usePlayer } from '../../player/PlayerContext';
 import {
   Play,
@@ -68,9 +68,19 @@ export const MiniPlayer: React.FC = () => {
   const isPlaying = state.status === 'playing';
   const progressPercent = state.duration > 0 ? (state.currentTime / state.duration) * 100 : 0;
 
-  const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = parseFloat(e.target.value);
-    seek((val / 100) * state.duration);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubPercent, setScrubPercent] = useState(0);
+
+  const activePercent = isScrubbing ? scrubPercent : progressPercent;
+  const activeCurrentTime = isScrubbing
+    ? (scrubPercent / 100) * state.duration
+    : state.currentTime;
+
+  const commitSeek = (percent: number) => {
+    if (state.duration > 0) {
+      seek((percent / 100) * state.duration);
+    }
+    setIsScrubbing(false);
   };
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,11 +97,23 @@ export const MiniPlayer: React.FC = () => {
 
   return (
     <div className="relative h-16 md:h-24 w-full bg-[var(--surface)] border-t border-[var(--border)] px-3 md:px-6 flex items-center justify-between gap-2 md:gap-4 z-40 select-none backdrop-blur-md">
-      {/* Top Thin Progress Bar for Mobile */}
-      <div className="md:hidden absolute top-0 left-0 right-0 h-1 bg-[var(--progress-bg)] overflow-hidden">
-        <div
-          className="h-full bg-[var(--accent)] transition-all duration-150"
-          style={{ width: `${progressPercent}%` }}
+      {/* Interactive Seek/Progress Bar for Mobile */}
+      <div className="md:hidden absolute -top-1.5 left-0 right-0 h-3 flex items-center z-50 px-0">
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={0.1}
+          value={activePercent}
+          onChange={(e) => {
+            setIsScrubbing(true);
+            setScrubPercent(parseFloat(e.target.value));
+          }}
+          onMouseUp={(e) => commitSeek(parseFloat((e.target as HTMLInputElement).value))}
+          onTouchEnd={(e) => commitSeek(parseFloat((e.target as HTMLInputElement).value))}
+          className="w-full h-1.5 appearance-none cursor-pointer bg-[var(--progress-bg)] accent-[var(--accent)] focus:outline-none"
+          title={`Seek: ${formatTime(activeCurrentTime)} / ${formatTime(state.duration)}`}
+          aria-label="Seek track position"
         />
       </div>
 
@@ -99,17 +121,16 @@ export const MiniPlayer: React.FC = () => {
       <div className="flex items-center gap-2.5 md:gap-4 min-w-0 flex-1 md:flex-none md:min-w-[220px] md:max-w-[320px]">
         <div
           onClick={() => setIsFullPlayerOpen(true)}
-          className="relative group w-11 h-11 md:w-13 md:h-13 rounded-full overflow-hidden bg-black/60 border-2 border-purple-500/40 shrink-0 cursor-pointer flex items-center justify-center shadow-lg"
+          className="relative group w-11 h-11 md:w-13 md:h-13 rounded-2xl overflow-hidden bg-black/40 border border-purple-500/30 shrink-0 cursor-pointer flex items-center justify-center shadow-md"
         >
           <img
             src={currentTrack?.coverArtUrl || (currentTrack ? generateVibrantCover(currentTrack.title, currentTrack.artist) : '/icon.png')}
             alt={currentTrack?.title || 'Mini player'}
-            className={`w-full h-full object-cover ${isPlaying ? 'animate-spin-slow' : ''}`}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
             onError={(e) => {
               (e.target as HTMLImageElement).src = currentTrack ? generateVibrantCover(currentTrack.title, currentTrack.artist) : '/icon.png';
             }}
           />
-          <div className="absolute inset-0 m-auto w-3 h-3 rounded-full bg-black/80 border border-purple-400" />
         </div>
 
         <div className="min-w-0 flex-1" onClick={() => setIsFullPlayerOpen(true)}>
@@ -220,13 +241,13 @@ export const MiniPlayer: React.FC = () => {
 
           <button
             onClick={togglePlayPause}
-            className="w-10 h-10 rounded-full btn-primary flex items-center justify-center shadow-lg transition-transform active:scale-95"
+            className="w-10 h-10 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white flex items-center justify-center shadow-lg shadow-purple-900/30 transition-transform active:scale-95"
             title={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="w-5 h-5 fill-current text-[var(--btn-text)]" />
+              <Pause className="w-5 h-5 fill-current text-white" />
             ) : (
-              <Play className="w-5 h-5 fill-current ml-0.5 text-[var(--btn-text)]" />
+              <Play className="w-5 h-5 fill-current ml-0.5 text-white" />
             )}
           </button>
 
@@ -264,16 +285,23 @@ export const MiniPlayer: React.FC = () => {
 
         {/* Seek Bar */}
         <div className="w-full flex items-center gap-3 text-xs text-[var(--text-muted)] font-mono">
-          <span className="w-10 text-right">{formatTime(state.currentTime)}</span>
+          <span className="w-10 text-right">{formatTime(activeCurrentTime)}</span>
           <div className="relative flex-1 group flex items-center">
             <input
               type="range"
               min={0}
               max={100}
               step={0.1}
-              value={progressPercent}
-              onChange={handleSeekChange}
+              value={activePercent}
+              onChange={(e) => {
+                setIsScrubbing(true);
+                setScrubPercent(parseFloat(e.target.value));
+              }}
+              onMouseUp={(e) => commitSeek(parseFloat((e.target as HTMLInputElement).value))}
+              onTouchEnd={(e) => commitSeek(parseFloat((e.target as HTMLInputElement).value))}
               className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-[var(--progress-bg)] accent-[var(--accent)] focus:outline-none"
+              title={`Seek: ${formatTime(activeCurrentTime)} / ${formatTime(state.duration)}`}
+              aria-label="Seek track position"
             />
           </div>
           <span className="w-10">{formatTime(state.duration)}</span>
@@ -284,13 +312,13 @@ export const MiniPlayer: React.FC = () => {
       <div className="flex md:hidden items-center gap-1 shrink-0">
         <button
           onClick={togglePlayPause}
-          className="w-9 h-9 rounded-full btn-primary flex items-center justify-center shadow-md active:scale-95"
+          className="w-9 h-9 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white flex items-center justify-center shadow-md shadow-purple-900/30 active:scale-95"
           title={isPlaying ? 'Pause' : 'Play'}
         >
           {isPlaying ? (
-            <Pause className="w-4 h-4 fill-current text-[var(--btn-text)]" />
+            <Pause className="w-4 h-4 fill-current text-white" />
           ) : (
-            <Play className="w-4 h-4 fill-current ml-0.5 text-[var(--btn-text)]" />
+            <Play className="w-4 h-4 fill-current ml-0.5 text-white" />
           )}
         </button>
         <button
@@ -324,19 +352,6 @@ export const MiniPlayer: React.FC = () => {
           {state.playbackRate.toFixed(2).replace(/\.00$/, '')}x
         </button>
 
-        {/* Queue Drawer Button */}
-        <button
-          onClick={toggleQueue}
-          className="relative p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] border border-transparent hover:border-[var(--border)] transition-colors"
-          title="Playback Queue"
-        >
-          <ListMusic className="w-4 h-4" />
-          {queue.length > 0 && (
-            <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-[var(--accent)] text-[var(--btn-text)] text-[9px] font-bold flex items-center justify-center">
-              {queue.length}
-            </span>
-          )}
-        </button>
 
         {/* Equalizer & Audio DSP Studio */}
         <button

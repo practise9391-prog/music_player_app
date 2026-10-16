@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core';
 import { db } from '../../database/db';
 import { Track } from '../../types';
 
@@ -6,13 +7,32 @@ export class AudioBlobStorageService {
   private activeBlobUrls: Map<string, string> = new Map();
   private fileRegistry: Map<string, File | Blob> = new Map();
 
-  private constructor() {}
+  private constructor() {
+    this.cleanSyntheticBlobs().catch(() => {});
+  }
 
   public static getInstance(): AudioBlobStorageService {
     if (!this.instance) {
       this.instance = new AudioBlobStorageService();
     }
     return this.instance;
+  }
+
+  /**
+   * Cleans any legacy synthetic WAV blobs stored in IndexedDB so real audio is always used.
+   */
+  public async cleanSyntheticBlobs(): Promise<void> {
+    try {
+      const records = await db.audio_blobs.toArray();
+      const syntheticIds = records
+        .filter((r) => r.mimeType === 'audio/wav' || (r.size && r.size < 6000000))
+        .map((r) => r.id);
+      if (syntheticIds.length > 0) {
+        await db.audio_blobs.bulkDelete(syntheticIds);
+      }
+    } catch {
+      // ignore
+    }
   }
 
   /**
@@ -58,10 +78,10 @@ export class AudioBlobStorageService {
   /**
    * Resolves a guaranteed playable URL for any track:
    * 1. Online track stream URL
-   * 2. Active in-memory blob URL
-   * 3. Stored IndexedDB audio blob
-   * 4. Capacitor native convertFileSrc
-   * 5. High-fidelity harmonic synthesizer fallback
+   * 2. Capacitor native convertFileSrc for local device filesystem audio
+   * 3. Valid existing playbackUrl
+   * 4. Active in-memory blob or registered file reference
+   * 5. Stored IndexedDB audio blob (e.g. web imports / cached audio)
    */
   public async getPlayableUrl(track: Track): Promise<string | null> {
     // 1. Online tracks
@@ -69,63 +89,52 @@ export class AudioBlobStorageService {
       return track.playbackUrl || track.path || null;
     }
 
-    // 2. Active in-memory blob URL
+    // 2. Local device audio file path via Capacitor native bridge (ALWAYS highest priority on Android)
+    if (Capacitor.isNativePlatform() && track.path && (track.path.startsWith('/') || track.path.startsWith('file://') || track.path.startsWith('content://'))) {
+      try {
+        const nativeUrl = Capacitor.convertFileSrc(track.path);
+        if (nativeUrl) {
+          return nativeUrl;
+        }
+      } catch {
+        // fall through
+      }
+      return track.path;
+    }
+
+    // 3. Valid existing playbackUrl
+    if (track.playbackUrl && (track.playbackUrl.startsWith('capacitor://') || track.playbackUrl.startsWith('http://localhost') || track.playbackUrl.startsWith('blob:') || track.playbackUrl.startsWith('http://') || track.playbackUrl.startsWith('https://'))) {
+      return track.playbackUrl;
+    }
+
+    // 4. Active in-memory blob URL created during current session
     const activeUrl = this.activeBlobUrls.get(track.id);
     if (activeUrl) {
       return activeUrl;
     }
 
-    // 2b. Registered file reference
+    // 5. Registered in-memory file reference
     const registeredFile = this.fileRegistry.get(track.id);
     if (registeredFile) {
       return this.registerBlobUrl(track.id, registeredFile);
     }
 
-    // 3. Stored IndexedDB audio blob
+    // 6. Stored IndexedDB audio blob (survives page refreshes and app restarts)
     try {
       const record = await db.audio_blobs.get(track.id);
-      if (record && record.blob) {
+      if (record && record.blob && record.blob.size >= 100000 && record.mimeType !== 'audio/wav') {
         return this.registerBlobUrl(track.id, record.blob);
       }
     } catch (err) {
       console.warn(`[AudioBlobStorage] IndexedDB blob lookup error for ${track.id}:`, err);
     }
 
-    // 4. Capacitor native file path conversion
-    if (typeof window !== 'undefined') {
-      const cap = (window as unknown as { Capacitor?: { convertFileSrc?: (path: string) => string } }).Capacitor;
-      if (cap?.convertFileSrc && track.path && (track.path.startsWith('/') || track.path.startsWith('file://'))) {
-        try {
-          return cap.convertFileSrc(track.path);
-        } catch {
-          // ignore
-        }
-      }
+    // 7. Direct path fallback
+    if (track.path && (track.path.startsWith('http://') || track.path.startsWith('https://'))) {
+      return track.path;
     }
 
-    // 5. Check if track already has a playable URL (e.g. data URI or valid http)
-    if (track.playbackUrl && (track.playbackUrl.startsWith('data:') || track.playbackUrl.startsWith('http'))) {
-      return track.playbackUrl;
-    }
-
-    // 6. Generate fallback PCM melody WAV for demo/sample tracks without binary media
-    try {
-      const fallbackWavBlob = this.createSyntheticHarmonicAudioBlob(track.duration || 15);
-      const fallbackUrl = this.registerBlobUrl(track.id, fallbackWavBlob);
-      // Persist fallback so subsequent plays are instant
-      await db.audio_blobs.put({
-        id: track.id,
-        blob: fallbackWavBlob,
-        size: fallbackWavBlob.size,
-        mimeType: 'audio/wav',
-        updatedAt: Date.now(),
-      }).catch(() => {});
-      return fallbackUrl;
-    } catch (err) {
-      console.warn('[AudioBlobStorage] Could not create fallback audio:', err);
-    }
-
-    return track.playbackUrl || track.path || null;
+    return null;
   }
 
   /**

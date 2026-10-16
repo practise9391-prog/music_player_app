@@ -1,4 +1,4 @@
-export type AudioFormat = 'mp3' | 'flac' | 'wav' | 'ogg' | 'm4a' | 'aac' | 'opus' | 'webm';
+export type AudioFormat = 'mp3' | 'flac' | 'wav' | 'ogg' | 'm4a' | 'aac' | 'opus' | 'webm' | 'wma' | 'mp4' | 'mkv';
 
 export type TrackSource = 'local' | 'online';
 
@@ -8,6 +8,7 @@ export interface Track {
   folderPath?: string;
   path: string; // file path or URL
   filename?: string;
+  mediaType?: 'audio' | 'video';
   title: string;
   artist: string;
   album?: string;

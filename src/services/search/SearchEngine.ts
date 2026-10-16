@@ -131,7 +131,8 @@ export class SearchEngine {
     const comment = (track.comment || '').toLowerCase();
     const filename = (track.filename || track.path || '').toLowerCase();
 
-    const fullQuery = terms.join(' ').toLowerCase();
+    const cleanTerms = terms.map((t) => t.toLowerCase().trim()).filter(Boolean);
+    const fullQuery = cleanTerms.join(' ');
 
     // 1. Exact title match (highest)
     if (title === fullQuery) {
@@ -189,24 +190,40 @@ export class SearchEngine {
     }
 
     // Multi-term support: check individual tokens
-    if (terms.length > 1) {
-      let allTermsMatched = true;
-      for (const term of terms) {
-        const matchesTerm =
+    for (const term of cleanTerms) {
+      if (title.includes(term)) {
+        score += 25;
+        if (!matchedFields.includes('title')) matchedFields.push('title');
+      }
+      if (artist.includes(term) || albumArtist.includes(term)) {
+        score += 20;
+        if (!matchedFields.includes('artist')) matchedFields.push('artist');
+      }
+      if (album.includes(term)) {
+        score += 15;
+        if (!matchedFields.includes('album')) matchedFields.push('album');
+      }
+      if (genre.includes(term)) {
+        score += 10;
+        if (!matchedFields.includes('genre')) matchedFields.push('genre');
+      }
+      if (filename.includes(term)) {
+        score += 10;
+        if (!matchedFields.includes('filename')) matchedFields.push('filename');
+      }
+    }
+
+    if (cleanTerms.length > 1) {
+      const allTermsPresent = cleanTerms.every(
+        (term) =>
           title.includes(term) ||
           artist.includes(term) ||
           album.includes(term) ||
           genre.includes(term) ||
-          filename.includes(term);
-
-        if (matchesTerm) {
-          score += 15;
-        } else {
-          allTermsMatched = false;
-        }
-      }
-      if (allTermsMatched) {
-        score += 40; // Bonus for containing all terms
+          filename.includes(term)
+      );
+      if (allTermsPresent) {
+        score += 50; // Bonus for containing all tokens
       }
     }
 
@@ -297,13 +314,13 @@ export class SearchEngine {
       case 'least_played':
         return list.sort((a, b) => (a.track.playCount || 0) - (b.track.playCount || 0));
       case 'title_asc':
-        return list.sort((a, b) => a.track.title.localeCompare(b.track.title));
+        return list.sort((a, b) => (a.track.title || '').localeCompare(b.track.title || ''));
       case 'title_desc':
-        return list.sort((a, b) => b.track.title.localeCompare(a.track.title));
+        return list.sort((a, b) => (b.track.title || '').localeCompare(a.track.title || ''));
       case 'artist_asc':
-        return list.sort((a, b) => a.track.artist.localeCompare(b.track.artist));
+        return list.sort((a, b) => (a.track.artist || '').localeCompare(b.track.artist || ''));
       case 'artist_desc':
-        return list.sort((a, b) => b.track.artist.localeCompare(a.track.artist));
+        return list.sort((a, b) => (b.track.artist || '').localeCompare(a.track.artist || ''));
       case 'album_asc':
         return list.sort((a, b) => (a.track.album || '').localeCompare(b.track.album || ''));
       case 'album_desc':
@@ -387,7 +404,7 @@ export class SearchEngine {
     let artistResults: SearchArtistResult[] = [];
     if ((activeType === 'all' || activeType === 'artists') && clean) {
       for (const artist of allArtists) {
-        const name = artist.name.toLowerCase();
+        const name = (artist.name || '').toLowerCase();
         let score = 0;
         if (name === clean) score = 100;
         else if (name.startsWith(clean)) score = 70;
@@ -405,8 +422,8 @@ export class SearchEngine {
     let albumResults: SearchAlbumResult[] = [];
     if ((activeType === 'all' || activeType === 'albums') && clean) {
       for (const album of allAlbums) {
-        const title = album.title.toLowerCase();
-        const artist = album.artist.toLowerCase();
+        const title = (album.title || '').toLowerCase();
+        const artist = (album.artist || '').toLowerCase();
         let score = 0;
         if (title === clean) score = 100;
         else if (title.startsWith(clean)) score = 70;
@@ -425,7 +442,7 @@ export class SearchEngine {
     let playlistResults: SearchPlaylistResult[] = [];
     if ((activeType === 'all' || activeType === 'playlists') && clean) {
       for (const pl of allPlaylists) {
-        const name = pl.name.toLowerCase();
+        const name = (pl.name || '').toLowerCase();
         const desc = (pl.description || '').toLowerCase();
         let score = 0;
         if (name === clean) score = 100;
@@ -444,7 +461,7 @@ export class SearchEngine {
     let genreResults: SearchGenreResult[] = [];
     if (activeType === 'all' && clean) {
       for (const g of allGenres) {
-        const name = g.name.toLowerCase();
+        const name = (g.name || '').toLowerCase();
         let score = 0;
         if (name === clean) score = 100;
         else if (name.startsWith(clean)) score = 70;
@@ -461,8 +478,8 @@ export class SearchEngine {
     let folderResults: SearchFolderResult[] = [];
     if ((activeType === 'all' || activeType === 'folders') && clean) {
       for (const folder of allFolders) {
-        const name = folder.name.toLowerCase();
-        const path = folder.path.toLowerCase();
+        const name = (folder.name || '').toLowerCase();
+        const path = (folder.path || '').toLowerCase();
         let score = 0;
         if (name === clean) score = 100;
         else if (name.includes(clean)) score = 50;

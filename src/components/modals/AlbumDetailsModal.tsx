@@ -88,23 +88,23 @@ export const AlbumDetailsModal: React.FC<AlbumDetailsModalProps> = ({
         </div>
 
         {/* Hero Section */}
-        <div className="p-6 bg-gradient-to-b from-[var(--surface-secondary)] to-[var(--surface-card)] flex flex-col sm:flex-row items-center gap-6 border-b border-[var(--border)]">
-          <div className="w-36 h-36 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] shadow-xl overflow-hidden shrink-0 flex items-center justify-center">
+        <div className="p-6 bg-gradient-to-b from-purple-950/40 via-[var(--surface-secondary)] to-[var(--surface-card)] flex flex-col sm:flex-row items-center gap-6 border-b border-[var(--border)]">
+          <div className="relative w-40 h-40 sm:w-48 sm:h-48 rounded-2xl bg-[var(--surface-card)] border border-purple-500/30 shadow-[0_8px_30px_rgba(139,92,246,0.3)] overflow-hidden shrink-0 flex items-center justify-center">
             {album.coverArtUrl ? (
               <img src={album.coverArtUrl} alt={album.title} className="w-full h-full object-cover" />
             ) : (
-              <Disc className="w-16 h-16 text-[var(--accent)]" />
+              <Disc className="w-20 h-20 text-[var(--accent)] opacity-80" />
             )}
           </div>
 
           <div className="flex-1 text-center sm:text-left space-y-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20">
               ALBUM
             </span>
-            <h2 className="text-2xl font-black text-[var(--text-primary)] leading-tight">
+            <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight tracking-tight">
               {album.title}
             </h2>
-            <p className="text-sm font-semibold text-[var(--text-secondary)]">{album.artist}</p>
+            <p className="text-sm sm:text-base font-semibold text-[var(--text-secondary)]">{album.artist}</p>
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 text-xs text-[var(--text-muted)] font-mono">
               {album.year && <span>{album.year}</span>}
               {album.genre && <span>• {album.genre}</span>}
@@ -112,7 +112,7 @@ export const AlbumDetailsModal: React.FC<AlbumDetailsModalProps> = ({
               <span>• {formatDuration(album.duration)}</span>
             </div>
 
-            <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+            <div className="pt-3 flex flex-wrap items-center justify-center sm:justify-start gap-3">
               <Button
                 variant="primary"
                 size="sm"
@@ -133,20 +133,10 @@ export const AlbumDetailsModal: React.FC<AlbumDetailsModalProps> = ({
               >
                 Shuffle
               </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<ListPlus className="w-3.5 h-3.5" />}
-                onClick={() => {
-                  album.tracks.forEach((t) => addToQueue(t));
-                }}
-              >
-                Queue All
-              </Button>
               <button
                 type="button"
                 onClick={handleToggleAlbumFavorite}
-                className={`p-2 rounded-xl border transition-colors ${
+                className={`p-2.5 rounded-xl border transition-colors ${
                   isAlbumFavorite
                     ? 'bg-rose-500/15 border-rose-500/30 text-rose-500'
                     : 'bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-white'
@@ -177,11 +167,21 @@ export const AlbumDetailsModal: React.FC<AlbumDetailsModalProps> = ({
                     key={track.id}
                     onClick={() => playTrack(track, album.tracks)}
                     className={`hover:bg-[var(--surface-secondary)] cursor-pointer transition-colors ${
-                      isCurrent ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'
+                      isCurrent
+                        ? 'text-[var(--accent)] font-bold bg-purple-500/10'
+                        : 'text-[var(--text-secondary)]'
                     }`}
                   >
                     <td className="p-2.5 text-center font-mono text-[var(--text-muted)]">
-                      {track.trackNumber || i + 1}
+                      {isCurrent ? (
+                        <div className="flex items-end justify-center gap-0.5 h-3">
+                          <span className="w-0.5 h-2.5 bg-purple-400 rounded-full animate-pulse" />
+                          <span className="w-0.5 h-3 bg-pink-400 rounded-full animate-pulse delay-75" />
+                          <span className="w-0.5 h-2 bg-cyan-400 rounded-full animate-pulse delay-150" />
+                        </div>
+                      ) : (
+                        track.trackNumber || i + 1
+                      )}
                     </td>
                     <td className="p-2.5 font-medium text-[var(--text-primary)]">
                       <div className="truncate">{track.title}</div>

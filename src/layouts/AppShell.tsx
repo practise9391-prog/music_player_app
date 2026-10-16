@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar, NavRoute } from '../components/layout/Sidebar';
 import { MobileBottomNav } from '../components/layout/MobileBottomNav';
 import { Header } from '../components/layout/Header';
 import { MiniPlayer } from '../components/player/MiniPlayer';
 import { FullPlayerModal } from '../components/player/FullPlayerModal';
-import { QueueDrawer } from '../components/player/QueueDrawer';
 import { AudioProcessingModal } from '../components/audio/AudioProcessingModal';
 import { SpatialAudioModal } from '../components/spatial/SpatialAudioModal';
 import { FullscreenVisualizerModal } from '../components/visualizer/FullscreenVisualizerModal';
@@ -299,6 +298,29 @@ export const AppShell: React.FC = () => {
     });
   };
 
+  const navigateToHome = useCallback(() => {
+    setSelectedPlaylistId(null);
+    setIsMobileSidebarOpen(false);
+    setIsGlobalSearchOpen(false);
+    setIsFullPlayerOpen(false);
+    setIsQueueOpen(false);
+    setIsDspModalOpen(false);
+    setIsSpatialModalOpen(false);
+    setIsIdentifyModalOpen(false);
+    setCurrentRoute('home');
+  }, [
+    setIsFullPlayerOpen,
+    setIsQueueOpen,
+    setIsDspModalOpen,
+    setIsSpatialModalOpen,
+  ]);
+
+  useEffect(() => {
+    const handleHomeEvent = () => navigateToHome();
+    window.addEventListener('nova-navigate-home', handleHomeEvent);
+    return () => window.removeEventListener('nova-navigate-home', handleHomeEvent);
+  }, [navigateToHome]);
+
   // Handler for adding a music folder directly from Home page
   const handleOpenMusicFolder = async () => {
     const res = await nativeBridge.pickDirectoryFiles();
@@ -349,10 +371,11 @@ export const AppShell: React.FC = () => {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col min-w-0 bg-[var(--background)] overflow-hidden">
           <Header
+            currentRoute={currentRoute}
             title={selectedPlaylistId ? 'Playlist' : currentRoute}
             canGoBack={currentRoute !== 'home' || Boolean(selectedPlaylistId)}
             onBack={handleGoBack}
-            onToggleSidebar={() => setIsMobileSidebarOpen((prev) => !prev)}
+            onNavigateHome={navigateToHome}
             onOpenNetworkModal={() => setIsNetworkModalOpen(true)}
             onOpenDebugModal={() => setIsDebugModalOpen(true)}
             searchQuery={searchQuery}
@@ -362,7 +385,29 @@ export const AppShell: React.FC = () => {
           />
 
           <div className="flex-1 flex overflow-hidden">
-            {currentRoute === 'home' && (
+            {currentRoute === 'library' && (
+              <LibraryPage searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+            )}
+            {currentRoute === 'albums' && (
+              <LibraryPage initialTab="albums" searchQuery={searchQuery} onSearchChange={setSearchQuery} />
+            )}
+            {currentRoute === 'playlists' && (
+              <PlaylistsPage
+                initialPlaylistId={selectedPlaylistId}
+                onClearInitialId={() => setSelectedPlaylistId(null)}
+              />
+            )}
+            {currentRoute === 'history' && (
+              <HistoryPage onNavigate={(r) => setCurrentRoute(r)} />
+            )}
+            {currentRoute === 'favorites' && <FavoritesPage />}
+            <div className={`flex-1 flex overflow-hidden ${currentRoute === 'online' ? '' : 'hidden'}`}>
+              <OnlinePage onOpenNetworkModal={() => setIsNetworkModalOpen(true)} />
+            </div>
+            {currentRoute === 'downloads' && <DownloadsPage />}
+            {currentRoute === 'settings' && <SettingsPage />}
+            {/* Home route and safe fallback: never display a blank empty layout */}
+            {(currentRoute === 'home' || !['library', 'albums', 'playlists', 'history', 'favorites', 'online', 'downloads', 'settings'].includes(currentRoute)) && (
               <HomePage
                 onOpenFolder={handleOpenMusicFolder}
                 onAddMusic={handleAddMusicFiles}
@@ -377,20 +422,6 @@ export const AppShell: React.FC = () => {
                 searchQuery={searchQuery}
               />
             )}
-            {currentRoute === 'library' && <LibraryPage />}
-            {currentRoute === 'playlists' && (
-              <PlaylistsPage
-                initialPlaylistId={selectedPlaylistId}
-                onClearInitialId={() => setSelectedPlaylistId(null)}
-              />
-            )}
-            {currentRoute === 'history' && <HistoryPage />}
-            {currentRoute === 'favorites' && <FavoritesPage />}
-            {currentRoute === 'online' && (
-              <OnlinePage onOpenNetworkModal={() => setIsNetworkModalOpen(true)} />
-            )}
-            {currentRoute === 'downloads' && <DownloadsPage />}
-            {currentRoute === 'settings' && <SettingsPage />}
           </div>
         </main>
       </div>
@@ -402,17 +433,19 @@ export const AppShell: React.FC = () => {
       <MobileBottomNav
         currentRoute={currentRoute}
         onNavigate={(r) => {
-          setSelectedPlaylistId(null);
-          setCurrentRoute(r);
+          if (r === 'home') {
+            navigateToHome();
+          } else {
+            setSelectedPlaylistId(null);
+            setIsFullPlayerOpen(false);
+            setCurrentRoute(r);
+          }
         }}
         onOpenSearch={() => setIsGlobalSearchOpen(true)}
       />
 
       {/* Full Player Modal */}
       <FullPlayerModal />
-
-      {/* Queue Drawer */}
-      <QueueDrawer />
 
       {/* Audio Studio & Equalizer DSP Modal */}
       <AudioProcessingModal />

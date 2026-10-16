@@ -131,16 +131,21 @@ export const TrackRepository = {
     const albumMap = new Map<string, Album>();
 
     for (const track of tracks) {
-      const albumTitle = track.album || 'Unknown Album';
-      const albumArtist = track.albumArtist || track.artist || 'Unknown Artist';
-      const key = `${albumTitle.toLowerCase()}:::${albumArtist.toLowerCase()}`;
+      const rawAlbum = track.album?.trim();
+      const albumTitle = rawAlbum && rawAlbum !== '<unknown>' ? rawAlbum : 'Unknown Album';
+      const isKnownAlbum = albumTitle.toLowerCase() !== 'unknown album';
+
+      // Group tracks primarily by album title when known so soundtrack albums with various singers stay together
+      const key = isKnownAlbum
+        ? albumTitle.toLowerCase()
+        : `${albumTitle.toLowerCase()}:::${(track.artist || 'unknown').toLowerCase()}`;
 
       let album = albumMap.get(key);
       if (!album) {
         album = {
           id: key,
           title: albumTitle,
-          artist: albumArtist,
+          artist: track.albumArtist || track.artist || 'Various Artists',
           year: track.year,
           genre: track.genre,
           trackCount: 0,
@@ -156,12 +161,26 @@ export const TrackRepository = {
       if (!album.coverArtUrl && track.coverArtUrl) {
         album.coverArtUrl = track.coverArtUrl;
       }
+      if (track.year && (!album.year || track.year < album.year)) {
+        album.year = track.year;
+      }
       album.tracks.push(track);
     }
 
-    // Sort tracks within each album by trackNumber
+    // Sort tracks within each album by trackNumber or title
     for (const album of albumMap.values()) {
-      album.tracks.sort((a, b) => (a.trackNumber || 999) - (b.trackNumber || 999));
+      album.tracks.sort((a, b) => {
+        if (a.trackNumber && b.trackNumber && a.trackNumber !== b.trackNumber) {
+          return a.trackNumber - b.trackNumber;
+        }
+        return (a.filename || a.title).localeCompare(b.filename || b.title, undefined, { numeric: true });
+      });
+
+      // If tracks have diverse artists and no single albumArtist is defined, show "Various Artists"
+      const artists = new Set(album.tracks.map((t) => t.artist).filter(Boolean));
+      if (artists.size > 1 && !album.tracks[0]?.albumArtist) {
+        album.artist = 'Various Artists';
+      }
     }
 
     return Array.from(albumMap.values()).sort((a, b) => a.title.localeCompare(b.title));
@@ -524,15 +543,55 @@ export const SearchHistoryRepository = {
 
 export const PlayHistoryRepository = {
   async addRecord(record: Omit<PlayHistoryRecord, 'id'>): Promise<number> {
-    return (await db.play_history.add(record as PlayHistoryRecord)) as number;
+    const now = record.playedAt || Date.now();
+    // Find existing entry by trackId or by matching title+artist+source
+    const existing = await db.play_history
+      .filter(
+        (r) =>
+          Boolean(r.trackId && record.trackId && r.trackId === record.trackId) ||
+          (r.title.toLowerCase().trim() === record.title.toLowerCase().trim() &&
+            r.artist.toLowerCase().trim() === record.artist.toLowerCase().trim() &&
+            r.source === record.source)
+      )
+      .first();
+
+    if (existing && existing.id !== undefined) {
+      await db.play_history.update(existing.id, {
+        ...record,
+        playedAt: now,
+        playDuration: (existing.playDuration || 0) + (record.playDuration || 0),
+        completed: record.completed || existing.completed,
+      });
+      return existing.id;
+    } else {
+      return (await db.play_history.add({
+        ...record,
+        playedAt: now,
+      } as PlayHistoryRecord)) as number;
+    }
   },
 
-  async getRecent(limit = 50): Promise<PlayHistoryRecord[]> {
+  async getRecent(limit = 100): Promise<PlayHistoryRecord[]> {
     return await db.play_history.orderBy('playedAt').reverse().limit(limit).toArray();
   },
 
   async getAll(): Promise<PlayHistoryRecord[]> {
     return await db.play_history.orderBy('playedAt').reverse().toArray();
+  },
+
+  async remove(id: number): Promise<void> {
+    await db.play_history.delete(id);
+  },
+
+  async getCounts(): Promise<{ all: number; local: number; online: number }> {
+    const all = await this.getAll();
+    const local = all.filter((r) => r.source !== 'online').length;
+    const online = all.filter((r) => r.source === 'online').length;
+    return {
+      all: local + online,
+      local,
+      online,
+    };
   },
 
   async clear(): Promise<void> {

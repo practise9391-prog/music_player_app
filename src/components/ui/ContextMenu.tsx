@@ -25,7 +25,7 @@ export interface ContextMenuProps {
   onClose: () => void;
   onPlay: (track: Track) => void;
   onPlayNext?: (track: Track) => void;
-  onAddToQueue: (track: Track) => void;
+  onAddToQueue?: (track: Track) => void;
   onAddToPlaylist?: (track: Track) => void;
   onToggleFavorite: (track: Track) => void;
   onShowProperties: (track: Track) => void;
@@ -99,30 +99,6 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
       >
         <Play className="w-3.5 h-3.5 text-[var(--accent)]" />
         <span>Play</span>
-      </button>
-
-      {onPlayNext && (
-        <button
-          onClick={() => {
-            onPlayNext(track);
-            onClose();
-          }}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-primary)] transition-colors"
-        >
-          <CornerDownRight className="w-3.5 h-3.5 text-[var(--accent)]" />
-          <span>Play Next</span>
-        </button>
-      )}
-
-      <button
-        onClick={() => {
-          onAddToQueue(track);
-          onClose();
-        }}
-        className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[var(--surface-secondary)] text-[var(--text-primary)] transition-colors"
-      >
-        <ListPlus className="w-3.5 h-3.5" />
-        <span>Add to Queue</span>
       </button>
 
       {onAddToPlaylist && (

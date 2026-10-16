@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePlayer } from '../../player/PlayerContext';
 import { useNetwork } from '../../network/NetworkContext';
 import { useSettings } from '../../settings/SettingsContext';
@@ -15,27 +15,23 @@ import {
   ArrowLeft,
   Sparkles,
   Sliders,
-  Shield,
-  Radio,
-  ListMusic,
   RotateCcw,
   RotateCw,
   Speaker,
-  Gauge,
-  Waves,
-  Compass,
-  Activity,
   Heart,
   Plus,
   FileText,
   FileAudio,
   Clock,
-  Car,
   Bookmark,
+  Activity,
+  Compass,
+  X,
+  Car,
+  Home,
 } from 'lucide-react';
 import { AddToPlaylistModal } from '../playlists/AddToPlaylistModal';
 import { AudioProfileName, SpatialMode } from '../../types';
-import { AudioVisualizer } from '../visualizer/AudioVisualizer';
 import { LyricsView } from '../lyrics/LyricsView';
 import { StarRating } from '../common/StarRating';
 import { AudioFormatInfoModal } from '../modals/AudioFormatInfoModal';
@@ -55,17 +51,12 @@ export const FullPlayerModal: React.FC = () => {
   const {
     state,
     currentTrack,
-    queue,
     isFullPlayerOpen,
     setIsFullPlayerOpen,
-    toggleQueue,
     toggleDspModal,
     toggleSpatialModal,
     toggleFullscreenVisualizer,
     spatialState,
-    visualizerSettings,
-    updateVisualizerSettings,
-    dspState,
     togglePlayPause,
     nextTrack,
     prevTrack,
@@ -79,7 +70,6 @@ export const FullPlayerModal: React.FC = () => {
     setRepeatMode,
     shuffleMode,
     cycleShuffleMode,
-    toggleShuffle,
     setAudioProfile,
     setSpatialMode,
     outputDevices,
@@ -87,35 +77,32 @@ export const FullPlayerModal: React.FC = () => {
     toggleFavorite,
     setTrackRating,
     audioFormatBadge,
-    activeAudioBadges,
-    audiobookControls,
   } = usePlayer();
 
   const { networkState } = useNetwork();
   const { settings } = useSettings();
-  const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = React.useState(false);
-  const [showLyrics, setShowLyrics] = React.useState(false);
-  const [isAudioFormatModalOpen, setIsAudioFormatModalOpen] = React.useState(false);
-  const [isSleepTimerOpen, setIsSleepTimerOpen] = React.useState(false);
-  const [isDrivingModeOpen, setIsDrivingModeOpen] = React.useState(false);
-  const [isBookmarksOpen, setIsBookmarksOpen] = React.useState(false);
 
-  // Auto-show lyrics if configured in settings (Req 40)
-  React.useEffect(() => {
+  // Settings Panels State (Exactly TWO right-side icons)
+  const [isSoundSettingsOpen, setIsSoundSettingsOpen] = useState(false);
+  const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState(false);
+
+  // Submodals & Views
+  const [showLyrics, setShowLyrics] = useState(false);
+  const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false);
+  const [isAudioFormatModalOpen, setIsAudioFormatModalOpen] = useState(false);
+  const [isSleepTimerOpen, setIsSleepTimerOpen] = useState(false);
+  const [isDrivingModeOpen, setIsDrivingModeOpen] = useState(false);
+  const [isBookmarksOpen, setIsBookmarksOpen] = useState(false);
+
+  // Auto-show lyrics if configured
+  useEffect(() => {
     if (settings.showLyricsAutomatically && currentTrack) {
       setShowLyrics(true);
     }
   }, [currentTrack?.id, settings.showLyricsAutomatically]);
 
-  // Listen for 'open-lyrics-view' from mini player or lock screen (Req 41)
-  React.useEffect(() => {
-    const handler = () => setShowLyrics(true);
-    window.addEventListener('open-lyrics-view', handler);
-    return () => window.removeEventListener('open-lyrics-view', handler);
-  }, []);
-
   // Toggle lyrics with 'L' key
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isFullPlayerOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
@@ -156,8 +143,6 @@ export const FullPlayerModal: React.FC = () => {
     { mode: 'headphone_spatial', label: 'Headphone Spatial' },
     { mode: '3d_audio', label: '3D Spatial Audio' },
     { mode: 'cinema', label: 'Cinema Immersion' },
-    { mode: 'live', label: 'Live Stage' },
-    { mode: 'room', label: 'Acoustic Room' },
   ];
 
   const BOOST_LEVELS = [
@@ -165,201 +150,94 @@ export const FullPlayerModal: React.FC = () => {
     { label: '125%', val: 1.25 },
     { label: '150%', val: 1.5 },
     { label: '200%', val: 2.0 },
-    { label: '250%', val: 2.5 },
-    { label: '300%', val: 3.0 },
   ];
 
-  const PLAYBACK_SPEEDS = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+  const coverUrl =
+    currentTrack?.coverArtUrl ||
+    generateVibrantCover(currentTrack?.title || 'Track', currentTrack?.artist);
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)]/95 backdrop-blur-2xl animate-in fade-in duration-200">
-      {/* Top Bar */}
-      <div className="h-14 md:h-16 px-3 sm:px-4 md:px-8 flex items-center justify-between border-b border-[var(--border)] gap-2 shrink-0">
-        <button
-          onClick={() => setIsFullPlayerOpen(false)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs sm:text-sm font-semibold text-[var(--text-primary)] transition-all shrink-0 border border-[var(--border)] active:scale-95 shadow-sm"
-          title="Back (Minimize Player)"
-          aria-label="Back"
-        >
-          <ArrowLeft className="w-4 h-4 text-[var(--accent)]" />
-          <span>Back</span>
-        </button>
-
-        {/* Network State Badge */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-medium">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              networkState.isAirGapped ? 'bg-amber-400' : 'bg-emerald-400'
-            }`}
-          />
-          <span className="text-[var(--text-secondary)]">
-            {networkState.isAirGapped ? '● OFFLINE (AIR-GAP)' : '● ONLINE — REQUESTED'}
-          </span>
-        </div>
-
-        {/* Desktop Buttons */}
-        <div className="hidden md:flex items-center gap-2.5">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[var(--background)] text-[var(--text-primary)] animate-in fade-in duration-200 select-none overflow-hidden">
+      {/* Top Header Bar */}
+      <div className="h-14 sm:h-16 px-3 sm:px-6 flex items-center justify-between border-b border-[var(--border)] shrink-0 bg-[var(--background)]/80 backdrop-blur-md z-20">
+        {/* Back / Minimize and Home Navigation */}
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
-            onClick={toggleDspModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs font-semibold text-[var(--accent)] border border-[var(--border)] transition-colors"
-            title="Open Equalizer & DSP Audio Studio (E)"
+            onClick={() => setIsFullPlayerOpen(false)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs sm:text-sm font-semibold text-[var(--text-primary)] transition-all shrink-0 border border-[var(--border)] active:scale-95 shadow-sm"
+            title="Minimize Now Playing"
+            aria-label="Back"
           >
-            <Sliders className="w-3.5 h-3.5" />
-            <span>Equalizer &amp; DSP</span>
+            <ChevronDown className="w-5 h-5 text-[var(--accent)]" />
+            <span className="hidden sm:inline">Minimize</span>
           </button>
 
           <button
-            onClick={toggleSpatialModal}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-              spatialState.enabled && !spatialState.bypass
-                ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'
-                : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-[var(--text-secondary)] border-[var(--border)]'
-            }`}
-            title="Open Spatial Audio & 3D Acoustics Studio"
+            onClick={() => {
+              setIsFullPlayerOpen(false);
+              window.dispatchEvent(new CustomEvent('nova-navigate-home'));
+            }}
+            className="p-1.5 sm:p-2 rounded-full bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-[var(--accent)] border border-[var(--border)] transition-all active:scale-95 shadow-sm flex items-center justify-center"
+            title="Go to Home"
+            aria-label="Home"
           >
-            <Compass className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Spatial Audio</span>
-          </button>
-
-          <button
-            onClick={toggleFullscreenVisualizer}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs font-semibold text-[var(--text-primary)] border border-[var(--border)] transition-colors"
-            title="Open Fullscreen Visualizer (V)"
-          >
-            <Activity className="w-3.5 h-3.5 text-[var(--accent)]" />
-            <span>Visualizer</span>
-          </button>
-
-          <button
-            onClick={() => setShowLyrics(!showLyrics)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
-              showLyrics
-                ? 'bg-[var(--accent)] text-[var(--btn-text)] border-[var(--accent)] shadow-sm'
-                : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-[var(--text-primary)] border-[var(--border)]'
-            }`}
-            title="Toggle Synchronized Lyrics (L)"
-          >
-            <FileText className="w-3.5 h-3.5 text-[var(--accent)]" />
-            <span>Lyrics</span>
-          </button>
-
-          <button
-            onClick={toggleQueue}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-xs font-semibold text-[var(--text-primary)] border border-[var(--border)] transition-colors"
-            title="Open Queue"
-          >
-            <ListMusic className="w-4 h-4 text-[var(--accent)]" />
-            <span>Queue ({queue.length})</span>
+            <Home className="w-4 h-4 text-[var(--accent)]" />
           </button>
         </div>
 
-        {/* Mobile Icon Buttons */}
-        <div className="flex md:hidden items-center gap-1.5">
+        {/* Center Track Title preview */}
+        <div className="text-center px-2 min-w-0 flex-1 max-w-xs sm:max-w-md">
+          <p className="text-[10px] uppercase font-bold tracking-widest text-[var(--accent)]">
+            Now Playing
+          </p>
+          <h2 className="text-xs sm:text-sm font-bold truncate text-[var(--text-primary)]">
+            {currentTrack?.title || 'No Track Playing'}
+          </h2>
+        </div>
+
+        {/* Exactly TWO Right-Side Settings Action Icons (Section 9 Requirement) */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Icon 1: Sound Settings (Volume, Boost, EQ/Profiles) */}
           <button
-            onClick={() => setShowLyrics(!showLyrics)}
-            className={`p-2 rounded-lg border transition-colors ${
-              showLyrics
-                ? 'bg-[var(--accent)] text-[var(--btn-text)] border-[var(--accent)]'
-                : 'bg-[var(--surface-secondary)] text-[var(--text-primary)] border-[var(--border)]'
+            onClick={() => {
+              setIsSoundSettingsOpen(!isSoundSettingsOpen);
+              setIsDisplaySettingsOpen(false);
+            }}
+            className={`p-2.5 rounded-full border transition-all active:scale-95 ${
+              isSoundSettingsOpen
+                ? 'bg-purple-600 text-white border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.5)]'
+                : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-purple-400 border-[var(--border)]'
             }`}
-            title="Lyrics"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-          <button
-            onClick={toggleDspModal}
-            className="p-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--accent)] border border-[var(--border)]"
-            title="Equalizer & DSP"
+            title="Sound Settings (Volume, Boost, Profiles)"
+            aria-label="Sound Settings"
           >
             <Sliders className="w-4 h-4" />
           </button>
+
+          {/* Icon 2: Display & Appearance (Visualizer, Lyrics, Sleep Timer) */}
           <button
-            onClick={toggleQueue}
-            className="p-2 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-primary)] border border-[var(--border)]"
-            title="Queue"
+            onClick={() => {
+              setIsDisplaySettingsOpen(!isDisplaySettingsOpen);
+              setIsSoundSettingsOpen(false);
+            }}
+            className={`p-2.5 rounded-full border transition-all active:scale-95 ${
+              isDisplaySettingsOpen || showLyrics
+                ? 'bg-pink-600 text-white border-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.5)]'
+                : 'bg-[var(--surface-secondary)] hover:bg-[var(--surface-card)] text-pink-400 border-[var(--border)]'
+            }`}
+            title="Display & Appearance (Visualizer, Lyrics, Timer)"
+            aria-label="Display & Appearance"
           >
-            <ListMusic className="w-4 h-4" />
+            <Sparkles className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Main Player Visual Stage */}
-      <div className="flex-1 max-w-5xl w-full mx-auto p-8 flex flex-col justify-center items-center gap-6 overflow-y-auto">
-        {/* Track Header */}
-        <div className="text-center space-y-1.5 max-w-lg">
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--text-primary)] tracking-tight">
-            {currentTrack?.title || 'No Track Selected'}
-          </h1>
-          <p className="text-base text-[var(--text-secondary)] font-medium">
-            {currentTrack?.artist || 'Unknown Artist'}
-          </p>
-          {currentTrack?.album && (
-            <p className="text-xs text-[var(--text-muted)]">{currentTrack.album}</p>
-          )}
-
-          {currentTrack && (
-            <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
-              <button
-                onClick={() => toggleFavorite(currentTrack.id)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-semibold transition-all ${
-                  currentTrack.isFavorite
-                    ? 'bg-rose-500/15 border-rose-500/30 text-rose-400'
-                    : 'bg-[var(--surface-secondary)] border-[var(--border)] text-[var(--text-secondary)] hover:text-white'
-                }`}
-              >
-                <Heart className={`w-3.5 h-3.5 ${currentTrack.isFavorite ? 'fill-current' : ''}`} />
-                <span>{currentTrack.isFavorite ? 'Favorited' : 'Favorite'}</span>
-              </button>
-
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)]">
-                <StarRating
-                  rating={currentTrack.rating || 0}
-                  onChange={(r) => setTrackRating(currentTrack.id, r)}
-                  size="sm"
-                />
-              </div>
-
-              <button
-                onClick={() => setIsAddToPlaylistOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] hover:text-white transition-all"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add to Playlist</span>
-              </button>
-
-              <button
-                onClick={() => setIsSleepTimerOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] hover:text-white transition-all"
-                title="Sleep Timer"
-              >
-                <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Timer</span>
-              </button>
-
-              <button
-                onClick={() => setIsBookmarksOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] hover:text-white transition-all"
-                title="Audio Bookmarks"
-              >
-                <Bookmark className="w-3.5 h-3.5 text-amber-400" />
-                <span>Bookmarks</span>
-              </button>
-
-              <button
-                onClick={() => setIsDrivingModeOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-semibold text-[var(--text-secondary)] hover:text-white transition-all"
-                title="Driving Mode"
-              >
-                <Car className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Drive</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Center Stage: Synchronized Lyrics View OR Circular Artwork Visualizer */}
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col justify-between items-center px-4 sm:px-8 py-3 overflow-y-auto relative z-10 max-w-2xl mx-auto w-full">
+        {/* Center Stage: Rotating Vinyl Disc OR Synchronized Lyrics */}
         {showLyrics ? (
-          <div className="w-full max-w-2xl h-80 my-2 animate-fade-in">
+          <div className="w-full max-w-xl h-72 sm:h-80 my-auto animate-fade-in">
             <LyricsView
               track={currentTrack}
               currentAudioPosition={state.currentTime}
@@ -367,101 +245,101 @@ export const FullPlayerModal: React.FC = () => {
             />
           </div>
         ) : (
-          <div className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-3xl overflow-hidden shadow-2xl border border-purple-500/30 my-3 bg-black/40">
-            <img
-              src={currentTrack?.coverArtUrl || generateVibrantCover(currentTrack?.title || 'Track', currentTrack?.artist)}
-              alt="Album Artwork"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).src = generateVibrantCover(currentTrack?.title || 'Track', currentTrack?.artist);
-              }}
-            />
-          </div>
-        )}
+          <div className="relative my-auto flex items-center justify-center py-4">
+            {/* Outer Ambient Multi-Color Halo */}
+            <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-purple-600/30 via-pink-600/20 to-cyan-500/30 blur-3xl -z-10 animate-pulse pointer-events-none" />
 
-        {/* Real-Time Spectrum / Waveform Visualizer (Section 39) */}
-        {visualizerSettings.enabled && (
-          <div className="w-full max-w-md h-16 rounded-xl overflow-hidden bg-black/25 border border-[var(--border)] px-3 py-1 shadow-inner relative group">
-            <AudioVisualizer mode={visualizerSettings.mode} className="w-full h-full" />
-            <button
-              onClick={toggleFullscreenVisualizer}
-              className="absolute top-1.5 right-1.5 opacity-0 group-hover:opacity-100 px-2 py-0.5 rounded bg-black/70 text-cyan-300 text-[10px] flex items-center gap-1 transition-opacity border border-white/10"
-              title="Fullscreen Visualizer (V)"
-            >
-              <span>V</span>
-            </button>
-          </div>
-        )}
-
-        {/* Technical Badges: Lossless & Stereo & Spatial & Processing Label */}
-        <div className="flex flex-wrap items-center justify-center gap-2.5">
-          {audioFormatBadge && (
+            {/* Vinyl Record Disc with Concentric Grooves */}
             <div
-              onClick={() => setIsAudioFormatModalOpen(true)}
-              className={`px-3 py-1 rounded-lg border text-xs font-mono font-bold cursor-pointer transition-all flex items-center gap-1.5 ${
-                audioFormatBadge === 'HI-RES'
-                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 hover:bg-amber-500/30'
-                  : audioFormatBadge === 'LOSSLESS'
-                  ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                  : 'bg-[var(--surface-card)] text-[var(--text-secondary)] border-[var(--border)]'
-              }`}
-              title="Click to view full audio stream specifications"
+              className="relative w-64 h-64 sm:w-72 sm:h-72 md:w-80 md:h-80 rounded-full bg-gradient-to-tr from-[#08090f] via-[#121524] to-[#08090f] p-3 shadow-2xl border-4 border-zinc-800/90 flex items-center justify-center animate-spin-slow transition-transform duration-700"
+              style={{
+                animationPlayState: isPlaying ? 'running' : 'paused',
+              }}
             >
-              <FileAudio className="w-3.5 h-3.5 text-[var(--accent)]" />
-              <span>{audioFormatBadge}</span>
+              {/* Concentric Grooves */}
+              <div className="absolute inset-3 rounded-full border border-white/5 pointer-events-none" />
+              <div className="absolute inset-6 rounded-full border border-white/5 pointer-events-none" />
+              <div className="absolute inset-10 rounded-full border border-white/5 pointer-events-none" />
+              <div className="absolute inset-14 rounded-full border border-white/5 pointer-events-none" />
+              <div className="absolute inset-18 rounded-full border border-white/5 pointer-events-none" />
+
+              {/* Center Record Label with Album Art */}
+              <div className="relative w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 rounded-full overflow-hidden border-2 border-purple-500/40 shadow-inner">
+                <img
+                  src={coverUrl}
+                  alt={currentTrack?.title || 'Cover'}
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).src = generateVibrantCover(
+                      currentTrack?.title || 'Track',
+                      currentTrack?.artist
+                    );
+                  }}
+                />
+                {/* Center Spindle Hole */}
+                <div className="absolute inset-0 m-auto w-6 h-6 rounded-full bg-[#090B14] border-2 border-white/40 shadow-inner" />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Track Metadata & Favorite */}
+        <div className="w-full text-center space-y-1.5 pt-2">
+          <div className="flex items-center justify-center gap-3">
+            <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight truncate max-w-md">
+              {currentTrack?.title || 'No Track Selected'}
+            </h1>
+            {currentTrack && (
+              <button
+                onClick={() => toggleFavorite(currentTrack.id)}
+                className="p-1.5 rounded-full hover:scale-110 active:scale-95 transition-all text-rose-500"
+                title="Favorite"
+              >
+                <Heart
+                  className={`w-5 h-5 ${
+                    currentTrack.isFavorite ? 'fill-current text-rose-500' : 'text-slate-400'
+                  }`}
+                />
+              </button>
+            )}
+          </div>
+
+          <p className="text-xs sm:text-sm font-semibold text-purple-300 truncate">
+            {currentTrack?.artist || 'Unknown Artist'}
+            {currentTrack?.album ? ` • ${currentTrack.album}` : ''}
+          </p>
+
+          {/* Quick Badges: Audio Format & Rating */}
+          {currentTrack && (
+            <div className="flex items-center justify-center gap-2 pt-1">
+              {audioFormatBadge && (
+                <span
+                  onClick={() => setIsAudioFormatModalOpen(true)}
+                  className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-pointer"
+                >
+                  {audioFormatBadge}
+                </span>
+              )}
+              <div className="flex items-center">
+                <StarRating
+                  rating={currentTrack.rating || 0}
+                  onChange={(r) => setTrackRating(currentTrack.id, r)}
+                  size="sm"
+                />
+              </div>
+              <button
+                onClick={() => setIsAddToPlaylistOpen(true)}
+                className="p-1 text-[var(--text-muted)] hover:text-white"
+                title="Add to Playlist"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
             </div>
           )}
-
-          <div
-            onClick={() => setIsAudioFormatModalOpen(true)}
-            className="px-3 py-1 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs text-[var(--text-secondary)] flex items-center gap-1.5 font-mono cursor-pointer"
-            title="Inspect audio properties"
-          >
-            <Radio className="w-3.5 h-3.5 text-[var(--accent)]" />
-            <span>
-              {currentTrack?.format?.toLowerCase() === 'flac' ||
-              currentTrack?.format?.toLowerCase() === 'wav'
-                ? `LOSSLESS ${currentTrack?.sampleRate ? `${currentTrack.sampleRate / 1000}kHz` : 'PCM'}`
-                : currentTrack?.bitrate
-                ? `${currentTrack.format?.toUpperCase()} / ${currentTrack.bitrate} kbps`
-                : `${currentTrack?.format?.toUpperCase() || 'AUDIO'}`}
-            </span>
-          </div>
-
-          <div className="px-3 py-1 rounded-lg bg-[var(--surface-card)] border border-[var(--border)] text-xs text-[var(--text-secondary)] flex items-center gap-1.5 font-mono">
-            <Shield className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{currentTrack?.channels === 1 ? '1.0 MONO' : '2.0 STEREO'}</span>
-          </div>
-
-          <div
-            onClick={toggleSpatialModal}
-            className="px-3 py-1 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-mono cursor-pointer transition-colors flex items-center gap-1.5"
-            title="Click to configure Spatial Audio"
-          >
-            <Compass className="w-3.5 h-3.5 text-cyan-400" />
-            <span className={spatialState.enabled && !spatialState.bypass ? 'text-cyan-400' : 'text-slate-400'}>
-              SPATIAL: {spatialState.enabled && !spatialState.bypass ? `${spatialState.mode.toUpperCase()} (${Math.round(spatialState.intensity * 100)}%)` : 'OFF'}
-            </span>
-          </div>
-
-          <div
-            onClick={toggleDspModal}
-            className="px-3 py-1 rounded-lg bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] text-xs font-mono cursor-pointer transition-colors flex items-center gap-1.5"
-            title="Click to configure Audio Control Center"
-          >
-            <Sliders className="w-3 h-3 text-[var(--accent)]" />
-            <span className={dspState.dspBypass ? 'text-amber-400' : 'text-emerald-400'}>
-              {dspState.dspBypass ? 'DSP BYPASS' : activeAudioBadges.length > 0 ? activeAudioBadges.join(' • ') : 'DSP ACTIVE'}
-            </span>
-          </div>
-
-          <div className="px-3 py-1 rounded-lg bg-[var(--surface-card)] border border-[var(--border)] text-xs text-[var(--text-secondary)] font-mono">
-            SPEED: {state.playbackRate.toFixed(2).replace(/\.00$/, '')}x
-          </div>
         </div>
 
         {/* Progress Seek Bar */}
-        <div className="w-full max-w-xl space-y-1.5 font-mono text-xs">
+        <div className="w-full space-y-1 pt-3 font-mono text-xs">
           <input
             type="range"
             min={0}
@@ -469,256 +347,418 @@ export const FullPlayerModal: React.FC = () => {
             step={0.1}
             value={progressPercent}
             onChange={handleSeekChange}
-            className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-[var(--progress-bg)] accent-[var(--accent)] focus:outline-none"
+            className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-[var(--surface-secondary)] accent-purple-500 focus:outline-none"
+            aria-label="Seek track position"
           />
-          <div className="flex justify-between text-[var(--text-muted)]">
+          <div className="flex justify-between text-[11px] text-[var(--text-muted)]">
             <span>{formatTime(state.currentTime)}</span>
             <span>{formatTime(state.duration)}</span>
           </div>
         </div>
 
-        {/* Primary Controls */}
-        <div className="flex items-center justify-center gap-2 md:gap-5 w-full">
+        {/* Primary Controls (Shuffle, Prev, Play/Pause, Next, Repeat) */}
+        <div className="flex items-center justify-between w-full max-w-sm pt-2 pb-1">
+          {/* Shuffle Button */}
           <button
             onClick={cycleShuffleMode}
-            className={`px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`p-2.5 rounded-full transition-all active:scale-95 ${
               shuffleMode !== 'off'
-                ? 'text-[var(--accent)] bg-[var(--surface-secondary)] border border-[var(--accent)]/30'
-                : 'text-[var(--text-muted)] hover:text-white'
+                ? 'text-purple-400 bg-purple-500/20'
+                : 'text-slate-400 hover:text-white'
             }`}
-            title={`Shuffle Mode: ${shuffleMode.toUpperCase()} (Click to cycle Off / Normal / Smart / Album)`}
+            title={`Shuffle: ${shuffleMode.toUpperCase()}`}
           >
-            <Shuffle className="w-4 h-4 md:w-5 md:h-5" />
-            {shuffleMode !== 'off' && (
-              <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider">
-                {shuffleMode}
-              </span>
-            )}
+            <Shuffle className="w-5 h-5" />
           </button>
 
-          <button
-            onClick={() => seekBackward(5)}
-            className="hidden sm:flex p-2 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
-            title="Rewind 5s"
-          >
-            <RotateCcw className="w-5 h-5" />
-          </button>
-
+          {/* Previous Track */}
           <button
             onClick={prevTrack}
-            className="p-2 md:p-3 rounded-full text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors active:scale-95"
+            className="p-3 rounded-full text-white hover:bg-[var(--surface-secondary)] transition-all active:scale-95"
             title="Previous"
           >
-            <SkipBack className="w-5 h-5 md:w-6 md:h-6 fill-current" />
+            <SkipBack className="w-6 h-6 fill-current" />
           </button>
 
+          {/* Big Glowing Play / Pause Button */}
           <button
             onClick={togglePlayPause}
-            className="w-14 h-14 md:w-16 md:h-16 rounded-full btn-primary flex items-center justify-center shadow-xl active:scale-95 transition-transform"
+            className="w-16 h-16 rounded-full bg-gradient-to-tr from-purple-600 to-pink-500 hover:from-purple-500 hover:to-pink-400 text-white flex items-center justify-center shadow-[0_0_30px_rgba(168,85,247,0.5)] active:scale-95 transition-transform"
             title={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause className="w-6 h-6 md:w-7 md:h-7 fill-current text-[var(--btn-text)]" />
+              <Pause className="w-7 h-7 fill-current" />
             ) : (
-              <Play className="w-6 h-6 md:w-7 md:h-7 fill-current ml-1 text-[var(--btn-text)]" />
+              <Play className="w-7 h-7 fill-current ml-1" />
             )}
           </button>
 
+          {/* Next Track */}
           <button
             onClick={nextTrack}
-            className="p-2 md:p-3 rounded-full text-[var(--text-primary)] hover:bg-[var(--surface-secondary)] transition-colors active:scale-95"
+            className="p-3 rounded-full text-white hover:bg-[var(--surface-secondary)] transition-all active:scale-95"
             title="Next"
           >
-            <SkipForward className="w-5 h-5 md:w-6 md:h-6 fill-current" />
+            <SkipForward className="w-6 h-6 fill-current" />
           </button>
 
-          <button
-            onClick={() => seekForward(5)}
-            className="hidden sm:flex p-2 rounded-full text-[var(--text-secondary)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors"
-            title="Forward 5s"
-          >
-            <RotateCw className="w-5 h-5" />
-          </button>
-
+          {/* Repeat Button */}
           <button
             onClick={() => {
               if (state.repeatMode === 'off') setRepeatMode('all');
               else if (state.repeatMode === 'all') setRepeatMode('one');
               else setRepeatMode('off');
             }}
-            className={`p-2.5 rounded-xl transition-colors relative ${
+            className={`p-2.5 rounded-full transition-all relative active:scale-95 ${
               state.repeatMode !== 'off'
-                ? 'text-[var(--accent)] bg-[var(--surface-secondary)]'
-                : 'text-[var(--text-muted)] hover:text-white'
+                ? 'text-pink-400 bg-pink-500/20'
+                : 'text-slate-400 hover:text-white'
             }`}
             title={`Repeat: ${state.repeatMode}`}
           >
             <Repeat className="w-5 h-5" />
             {state.repeatMode === 'one' && (
-              <span className="absolute -top-1 -right-1 text-[9px] font-bold text-[var(--accent)]">
+              <span className="absolute top-1 right-1 text-[9px] font-bold text-pink-400">
                 1
               </span>
             )}
           </button>
         </div>
-
-        {/* Advanced Audio Processing Controls Panel */}
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--border-subtle)]">
-          {/* 1. Volume & Safe Amplification Boost */}
-          <div className="p-4 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] space-y-3">
-            <div className="flex justify-between items-center text-xs font-semibold text-[var(--text-primary)]">
-              <span className="flex items-center gap-1.5 cursor-pointer" onClick={toggleMute}>
-                {state.isMuted ? (
-                  <VolumeX className="w-4 h-4 text-red-400" />
-                ) : (
-                  <Volume2 className="w-4 h-4 text-[var(--accent)]" />
-                )}
-                <span>Volume &amp; Boost</span>
-              </span>
-              <span className="font-mono text-[var(--accent)]">
-                {state.isMuted ? 'Muted' : `${(state.volume * 100).toFixed(0)}%`}
-              </span>
-            </div>
-
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={state.isMuted ? 0 : state.volume}
-              onChange={(e) => setVolume(parseFloat(e.target.value))}
-              className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-[var(--surface-secondary)] accent-[var(--accent)]"
-            />
-
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider">
-                Amplification Boost
-              </span>
-              <div className="grid grid-cols-3 gap-1">
-                {BOOST_LEVELS.map((b) => (
-                  <button
-                    key={b.val}
-                    onClick={() => setVolumeBoost(b.val)}
-                    className={`py-1 text-[10px] font-mono rounded font-semibold transition-colors ${
-                      state.boostLevel === b.val
-                        ? 'bg-[var(--accent)] text-[var(--btn-text)]'
-                        : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-white'
-                    }`}
-                  >
-                    {b.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {state.boostLevel > 1.0 && (
-              <div className="text-[10px] text-amber-400 bg-amber-500/10 p-2 rounded border border-amber-500/20">
-                Limiter active: Clipping protected (-0.5dB).
-              </div>
-            )}
-          </div>
-
-          {/* 2. Sound EQ Profile Selector */}
-          <div className="p-4 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] space-y-2">
-            <div className="flex justify-between items-center text-xs font-semibold text-[var(--text-primary)]">
-              <span className="flex items-center gap-1.5">
-                <Sliders className="w-4 h-4 text-[var(--accent)]" /> Sound Profile
-              </span>
-              <span className="text-[var(--accent)] font-semibold truncate max-w-[80px]">
-                {state.activeProfile}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 max-h-36 overflow-y-auto pr-1">
-              {PROFILES.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setAudioProfile(p)}
-                  className={`text-left px-2 py-1.5 rounded text-xs font-medium transition-colors truncate ${
-                    state.activeProfile === p
-                      ? 'bg-[var(--accent)] text-[var(--btn-text)] font-bold'
-                      : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--surface)] hover:text-white'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. Spatial Audio Selector */}
-          <div className="p-4 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] space-y-2">
-            <div className="flex justify-between items-center text-xs font-semibold text-[var(--text-primary)]">
-              <span className="flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-[var(--accent)]" /> Spatial Audio
-              </span>
-            </div>
-            <div className="space-y-1">
-              {SPATIAL_MODES.map((sm) => (
-                <button
-                  key={sm.mode}
-                  onClick={() => setSpatialMode(sm.mode)}
-                  className={`w-full text-left px-2.5 py-1.5 rounded text-xs transition-colors flex items-center justify-between ${
-                    state.spatialMode === sm.mode
-                      ? 'bg-[var(--accent)] text-[var(--btn-text)] font-bold'
-                      : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--surface)] hover:text-white'
-                  }`}
-                >
-                  <span className="truncate">{sm.label}</span>
-                  {state.spatialMode === sm.mode && <span className="text-[10px]">●</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 4. Playback Speed & Output Device */}
-          <div className="p-4 rounded-xl bg-[var(--surface-card)] border border-[var(--border)] space-y-3">
-            <div>
-              <div className="flex justify-between items-center text-xs font-semibold text-[var(--text-primary)] mb-1.5">
-                <span className="flex items-center gap-1.5">
-                  <Gauge className="w-4 h-4 text-[var(--accent)]" /> Speed
-                </span>
-                <span className="text-[var(--accent)] font-mono">{state.playbackRate}x</span>
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {PLAYBACK_SPEEDS.map((sp) => (
-                  <button
-                    key={sp}
-                    onClick={() => setPlaybackRate(sp)}
-                    className={`py-1 text-[10px] font-mono rounded font-semibold transition-colors ${
-                      state.playbackRate === sp
-                        ? 'bg-[var(--accent)] text-[var(--btn-text)]'
-                        : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-white'
-                    }`}
-                  >
-                    {sp}x
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {outputDevices.length > 0 && (
-              <div className="space-y-1">
-                <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] tracking-wider flex items-center gap-1">
-                  <Speaker className="w-3 h-3 text-[var(--accent)]" /> Audio Output
-                </span>
-                <select
-                  value={state.outputDeviceId || 'default'}
-                  onChange={(e) => setOutputDevice(e.target.value)}
-                  className="w-full bg-[var(--surface-secondary)] text-xs text-[var(--text-secondary)] border border-[var(--border)] rounded px-2 py-1 outline-none focus:border-[var(--accent)]"
-                >
-                  {outputDevices.map((d) => (
-                    <option key={d.deviceId} value={d.deviceId}>
-                      {d.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* Add To Playlist Modal */}
+      {/* Bottom Glowing Neon Wave Effect (Panel 7 of Reference Image) */}
+      <div className="w-full h-16 pointer-events-none relative overflow-hidden shrink-0 mt-auto opacity-75">
+        <svg
+          viewBox="0 0 1200 120"
+          preserveAspectRatio="none"
+          className="w-full h-full"
+        >
+          <defs>
+            <linearGradient id="neonWaveGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#EC4899" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#22D3EE" stopOpacity="0.8" />
+            </linearGradient>
+            <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="4" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+          </defs>
+          <path
+            d="M0,60 C150,110 350,10 500,60 C650,110 850,10 1000,60 C1100,85 1150,50 1200,60 L1200,120 L0,120 Z"
+            fill="url(#neonWaveGrad)"
+            opacity="0.25"
+            filter="url(#neonGlow)"
+            className={isPlaying ? 'animate-pulse' : ''}
+          />
+          <path
+            d="M0,70 Q300,10 600,60 T1200,50 L1200,120 L0,120 Z"
+            fill="url(#neonWaveGrad)"
+            opacity="0.4"
+          />
+          <path
+            d="M0,80 C200,40 400,100 600,70 C800,40 1000,90 1200,75 L1200,120 L0,120 Z"
+            fill="url(#neonWaveGrad)"
+            opacity="0.6"
+          />
+        </svg>
+      </div>
+
+      {/* Slide-out Panel 1: Sound Settings (Icon 1) */}
+      {isSoundSettingsOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex justify-end animate-fade-in">
+          <div className="w-full max-w-sm h-full bg-[#101426] border-l border-[var(--border)] p-6 flex flex-col justify-between overflow-y-auto space-y-6 animate-in slide-in-from-right duration-200">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2">
+                  <Sliders className="w-5 h-5 text-purple-400" />
+                  <h3 className="font-bold text-white text-base">Sound Settings</h3>
+                </div>
+                <button
+                  onClick={() => setIsSoundSettingsOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Volume Slider */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs font-semibold">
+                  <span
+                    className="flex items-center gap-1.5 cursor-pointer text-white"
+                    onClick={toggleMute}
+                  >
+                    {state.isMuted ? (
+                      <VolumeX className="w-4 h-4 text-red-400" />
+                    ) : (
+                      <Volume2 className="w-4 h-4 text-purple-400" />
+                    )}
+                    <span>Master Volume</span>
+                  </span>
+                  <span className="font-mono text-purple-400">
+                    {state.isMuted ? 'Muted' : `${(state.volume * 100).toFixed(0)}%`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={state.isMuted ? 0 : state.volume}
+                  onChange={(e) => setVolume(parseFloat(e.target.value))}
+                  className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-[var(--surface-secondary)] accent-purple-500"
+                />
+              </div>
+
+              {/* Volume Boost */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Amplification Boost
+                </span>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {BOOST_LEVELS.map((b) => (
+                    <button
+                      key={b.val}
+                      onClick={() => setVolumeBoost(b.val)}
+                      className={`py-1.5 text-xs font-mono rounded-lg font-semibold transition-all ${
+                        state.boostLevel === b.val
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-white'
+                      }`}
+                    >
+                      {b.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Equalizer & Sound Profiles */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Sound Profile (EQ)
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {PROFILES.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setAudioProfile(p)}
+                      className={`px-3 py-2 rounded-xl text-xs font-semibold text-left transition-all ${
+                        state.activeProfile === p
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--surface-card)] hover:text-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Spatial Mode Selector */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                  Spatial Acoustics
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  {SPATIAL_MODES.map((sm) => (
+                    <button
+                      key={sm.mode}
+                      onClick={() => setSpatialMode(sm.mode)}
+                      className={`px-2.5 py-1.5 rounded-xl text-[11px] font-medium text-left transition-all truncate ${
+                        state.spatialMode === sm.mode
+                          ? 'bg-cyan-600 text-white shadow-md'
+                          : 'bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:bg-[var(--surface-card)] hover:text-white'
+                      }`}
+                    >
+                      {sm.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Output Device */}
+              {outputDevices.length > 0 && (
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] flex items-center gap-1.5">
+                    <Speaker className="w-3.5 h-3.5 text-purple-400" /> Audio Output
+                  </span>
+                  <select
+                    value={state.outputDeviceId || 'default'}
+                    onChange={(e) => setOutputDevice(e.target.value)}
+                    className="w-full bg-[var(--surface-secondary)] text-xs text-white border border-[var(--border)] rounded-xl px-3 py-2 outline-none"
+                  >
+                    {outputDevices.map((d) => (
+                      <option key={d.deviceId} value={d.deviceId}>
+                        {d.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Launch Full Studio */}
+            <button
+              onClick={() => {
+                setIsSoundSettingsOpen(false);
+                toggleDspModal();
+              }}
+              className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-lg active:scale-95 transition-all text-center"
+            >
+              Open Equalizer Studio
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Slide-out Panel 2: Display & Appearance (Icon 2) */}
+      {isDisplaySettingsOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm flex justify-end animate-fade-in">
+          <div className="w-full max-w-sm h-full bg-[#101426] border-l border-[var(--border)] p-6 flex flex-col justify-between overflow-y-auto space-y-6 animate-in slide-in-from-right duration-200">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-pink-400" />
+                  <h3 className="font-bold text-white text-base">Display &amp; Modes</h3>
+                </div>
+                <button
+                  onClick={() => setIsDisplaySettingsOpen(false)}
+                  className="p-1.5 rounded-full hover:bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:text-white"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Action List */}
+              <div className="space-y-2.5">
+                {/* Lyrics View */}
+                <button
+                  onClick={() => {
+                    setShowLyrics(!showLyrics);
+                    setIsDisplaySettingsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                    showLyrics
+                      ? 'bg-pink-600/20 border-pink-500 text-pink-300'
+                      : 'bg-[var(--surface-secondary)] border-[var(--border)] text-white hover:bg-[var(--surface-card)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <FileText className="w-5 h-5 text-pink-400" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold">Synchronized Lyrics</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        {showLyrics ? 'Currently Showing' : 'Show embedded & synced lyrics'}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold font-mono">
+                    {showLyrics ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+
+                {/* Fullscreen Visualizer */}
+                <button
+                  onClick={() => {
+                    setIsDisplaySettingsOpen(false);
+                    toggleFullscreenVisualizer();
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--border)] text-white hover:bg-[var(--surface-card)] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <Activity className="w-5 h-5 text-cyan-400" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold">Audio Visualizer</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        Real-time spectrum & waveform visualizer
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Sleep Timer */}
+                <button
+                  onClick={() => {
+                    setIsDisplaySettingsOpen(false);
+                    setIsSleepTimerOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--border)] text-white hover:bg-[var(--surface-card)] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-amber-400" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold">Sleep Timer</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        Auto-stop playback after selected duration
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Driving Mode */}
+                <button
+                  onClick={() => {
+                    setIsDisplaySettingsOpen(false);
+                    setIsDrivingModeOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--border)] text-white hover:bg-[var(--surface-card)] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <Car className="w-5 h-5 text-emerald-400" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold">Driving Mode</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        Large high-contrast touch interface
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Audio Bookmarks */}
+                <button
+                  onClick={() => {
+                    setIsDisplaySettingsOpen(false);
+                    setIsBookmarksOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--border)] text-white hover:bg-[var(--surface-card)] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <Bookmark className="w-5 h-5 text-purple-400" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold">Bookmarks</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        Save and recall position timestamps
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Audio Properties Modal */}
+                <button
+                  onClick={() => {
+                    setIsDisplaySettingsOpen(false);
+                    setIsAudioFormatModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between p-3 rounded-2xl bg-[var(--surface-secondary)] border border-[var(--border)] text-white hover:bg-[var(--surface-card)] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <FileAudio className="w-5 h-5 text-violet-400" />
+                    <div className="text-left">
+                      <p className="text-xs font-bold">Audio Stream Specs</p>
+                      <p className="text-[10px] text-[var(--text-muted)]">
+                        Bitrate, sample rate, codec & channels
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sub-modals */}
       {currentTrack && (
         <AddToPlaylistModal
           isOpen={isAddToPlaylistOpen}
@@ -727,31 +767,27 @@ export const FullPlayerModal: React.FC = () => {
         />
       )}
 
-      {/* Audio Format Info Modal */}
       <AudioFormatInfoModal
         isOpen={isAudioFormatModalOpen}
         onClose={() => setIsAudioFormatModalOpen(false)}
         track={currentTrack}
       />
 
-      {/* Sleep Timer Modal (Part 25) */}
       <SleepTimerModal
         isOpen={isSleepTimerOpen}
         onClose={() => setIsSleepTimerOpen(false)}
       />
 
-      {/* Driving Mode Modal (Part 25) */}
       <DrivingModeModal
         isOpen={isDrivingModeOpen}
         onClose={() => setIsDrivingModeOpen(false)}
         currentTrack={currentTrack}
-        isPlaying={state.status === 'playing'}
+        isPlaying={isPlaying}
         onTogglePlayPause={togglePlayPause}
         onNext={nextTrack}
         onPrev={prevTrack}
       />
 
-      {/* Bookmarks Drawer (Part 25) */}
       <BookmarksDrawer
         isOpen={isBookmarksOpen}
         onClose={() => setIsBookmarksOpen(false)}

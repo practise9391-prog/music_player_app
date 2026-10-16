@@ -227,42 +227,42 @@ export const AudioControlCenterModal: React.FC = () => {
       >
         <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl bg-[var(--surface-card)] border border-[var(--border)] shadow-2xl overflow-hidden">
           {/* HEADER BAR */}
-          <div className="h-16 px-4 sm:px-6 border-b border-[var(--border)] flex items-center justify-between bg-[var(--surface-secondary)]/60">
-            <div className="flex items-center gap-2 sm:gap-3">
+          <div className="min-h-[4rem] px-3 sm:px-6 py-2 border-b border-[var(--border)] flex items-center justify-between gap-2 bg-[var(--surface-secondary)]/60">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
               <button
                 onClick={handleClose}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] transition-all active:scale-95 shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold text-[var(--text-primary)] bg-[var(--surface-card)] hover:bg-[var(--surface-secondary)] border border-[var(--border)] transition-all active:scale-95 shadow-sm shrink-0"
                 title="Go back"
                 aria-label="Go back"
               >
                 <ArrowLeft className="w-4 h-4 text-[var(--accent)]" />
                 <span className="hidden sm:inline">Back</span>
               </button>
-              <div className="p-2 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hidden sm:block">
+              <div className="p-2 rounded-xl bg-[var(--accent)]/15 border border-[var(--accent)]/30 text-[var(--accent)] hidden sm:block shrink-0">
                 <Sliders className="w-5 h-5" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2
                     id="audio-control-center-title"
-                    className="text-base font-bold text-[var(--text-primary)]"
+                    className="text-sm sm:text-base font-bold text-[var(--text-primary)] truncate"
                   >
                     Audio Control Center
                   </h2>
                   {dspState.dspBypass && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                      DSP BYPASS
+                    <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-extrabold uppercase bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                      BYPASS
                     </span>
                   )}
                   {dspState.abState === 'B' && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-sky-500/20 text-sky-400 border border-sky-500/30">
-                      A/B (Reference)
+                    <span className="px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-extrabold uppercase bg-sky-500/20 text-sky-400 border border-sky-500/30">
+                      A/B Ref
                     </span>
                   )}
                   {audioFormatBadge && (
                     <span
                       onClick={() => setIsAudioFormatModalOpen(true)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase border cursor-pointer hover:brightness-125 transition-all ${
+                      className={`hidden xs:inline-block px-1.5 py-0.2 rounded text-[9px] sm:text-[10px] font-extrabold uppercase border cursor-pointer hover:brightness-125 transition-all ${
                         audioFormatBadge === 'HI-RES'
                           ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                           : audioFormatBadge === 'LOSSLESS'
@@ -275,17 +275,17 @@ export const AudioControlCenterModal: React.FC = () => {
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-[var(--text-secondary)] flex items-center gap-2">
-                  <span>9-Band Equalizer &bull; Dolby Architecture &bull; Audio Profiles &bull; Effects</span>
+                <p className="text-[11px] sm:text-xs text-[var(--text-secondary)] truncate">
+                  <span>9-Band Equalizer &bull; Audio Profiles &bull; Effects</span>
                 </p>
               </div>
             </div>
 
             {/* Quick Actions & Toggles */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
                 onClick={toggleAbComparison}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-colors ${
+                className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-bold border transition-colors ${
                   dspState.abState === 'B'
                     ? 'bg-sky-500 text-black border-sky-400'
                     : 'bg-[var(--surface)] text-[var(--text-secondary)] hover:text-white border-[var(--border)]'
@@ -297,7 +297,7 @@ export const AudioControlCenterModal: React.FC = () => {
 
               <button
                 onClick={() => setDspBypass(!dspState.dspBypass)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-colors ${
+                className={`px-2 sm:px-2.5 py-1 rounded-lg text-[11px] sm:text-xs font-semibold border transition-colors ${
                   dspState.dspBypass
                     ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
                     : 'bg-[var(--surface)] text-[var(--text-secondary)] hover:text-white border-[var(--border)]'
@@ -308,7 +308,8 @@ export const AudioControlCenterModal: React.FC = () => {
 
               <button
                 onClick={handleClose}
-                className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors ml-2"
+                className="p-1 sm:p-1.5 rounded-lg text-[var(--text-muted)] hover:text-white hover:bg-[var(--surface-secondary)] transition-colors ml-1"
+                title="Close modal"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -171,6 +171,7 @@ export class NativeMediaStoreService {
           folderPath: folderName,
           path: filePath,
           filename: raw.displayName || `${raw.title}.${ext}`,
+          mediaType: (ext === 'mp4' || ext === 'mkv') ? 'video' : 'audio',
           title: raw.title || raw.displayName || 'Unknown Title',
           artist: raw.artist && raw.artist !== '<unknown>' ? raw.artist : 'Unknown Artist',
           album: raw.album && raw.album !== '<unknown>' ? raw.album : 'Unknown Album',

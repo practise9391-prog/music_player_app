@@ -14,16 +14,14 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenSearch,
 }) => {
   const tabs: {
-    route: NavRoute | 'search';
+    route: NavRoute;
     label: string;
     icon: React.ComponentType<{ className?: string }>;
-    action?: () => void;
   }[] = [
     { route: 'home', label: 'Home', icon: Home },
     { route: 'library', label: 'Library', icon: Music2 },
     { route: 'online', label: 'Online', icon: Globe },
     { route: 'history', label: 'History', icon: History },
-    { route: 'search', label: 'Search', icon: Search, action: onOpenSearch },
   ];
 
   return (
@@ -33,17 +31,11 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
-        const isActive = tab.route !== 'search' && currentRoute === tab.route;
+        const isActive = currentRoute === tab.route;
         return (
           <button
             key={tab.label}
-            onClick={() => {
-              if (tab.action) {
-                tab.action();
-              } else if (tab.route !== 'search') {
-                onNavigate(tab.route as NavRoute);
-              }
-            }}
+            onClick={() => onNavigate(tab.route)}
             className={`flex flex-col items-center justify-center py-1 px-3 rounded-xl transition-all ${
               isActive
                 ? 'text-[var(--accent)] font-semibold scale-105'
